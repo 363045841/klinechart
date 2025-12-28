@@ -23,6 +23,9 @@ function priceToY(
   return paddingTop + viewHeight * (1 - ratio)
 }
 
+const UP_COLOR = 'rgba(214, 10, 34, 1)'
+const DOWN_COLOR = 'rgba(3, 123, 102, 1)'
+
 export function draw(
   ctx: CanvasRenderingContext2D,
   data: KLineData[],
@@ -62,8 +65,8 @@ export function draw(
     const rectHeight = Math.abs(openY - closeY) || 1
 
     const trend: kLineTrend = getKLineTrend(e)
-    const color = trend === 'up' ? 'red' : 'green'
 
+    const color = trend === 'up' ? UP_COLOR : DOWN_COLOR
     // 实体
     ctx.fillStyle = color
     ctx.fillRect(rectX, rectY, option.kWidth, rectHeight)
