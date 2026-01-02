@@ -1,14 +1,16 @@
 <template>
   <div class="chart-container" ref="containerRef" @scroll.passive="scheduleRender">
-    <canvas ref="canvasRef" class="chart-canvas"></canvas>
+    <div class="scroll-content" :style="{ width: totalWidth + 'px' }">
+      <canvas class="chart-canvas" ref="canvasRef"></canvas>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import type { KLineData } from '@/types/price'
-import { kLineDraw } from '@/utils/draw/kLine'
-import { drawMA5Line, drawMA10Line, drawMA20Line } from '@/utils/draw/MA'
+import { kLineDraw } from '@/utils/kLineDraw/kLine'
+import { drawMA5Line, drawMA10Line, drawMA20Line } from '@/utils/kLineDraw/MA'
 import { tagLog } from '@/utils/logger'
 
 type MAFlags = {
@@ -18,12 +20,12 @@ type MAFlags = {
 }
 
 const props = withDefaults(defineProps<{
-  data: KLineData[]           // 已经是绘图需要的最小结构（建议父组件先 toKLineData + 排序）
+  data: KLineData[]
   kWidth?: number
   kGap?: number
   yPaddingPx?: number
   showMA?: MAFlags
-  autoScrollToRight?: boolean // 数据更新后是否自动滚到最右看最新
+  autoScrollToRight?: boolean
 }>(), {
   kWidth: 10,
   kGap: 2,
@@ -37,13 +39,55 @@ const containerRef = ref<HTMLDivElement | null>(null)
 
 let rafId: number | null = null
 
+/* 计算总宽度，用于撑开滚动区域 */
+const totalWidth = computed(() => {
+  const n = props.data?.length ?? 0
+  return props.kGap + n * (props.kWidth + props.kGap)
+})
+
 function option() {
   return { kWidth: props.kWidth, kGap: props.kGap, yPaddingPx: props.yPaddingPx }
 }
 
-/**
- * 核心渲染：支持横向滚动
- */
+/* 计算可视范围的索引 */
+function getVisibleRange(
+  scrollLeft: number,
+  viewWidth: number,
+  kWidth: number,
+  kGap: number,
+  totalDataCount: number
+): { start: number; end: number } {
+  const unit = kWidth + kGap
+  /* 向下取整找起点，减1防止边缘闪烁 */
+  const start = Math.max(0, Math.floor(scrollLeft / unit) - 1)
+  /* 向上取整找终点，加1防止边缘闪烁 */
+  const end = Math.min(totalDataCount, Math.ceil((scrollLeft + viewWidth) / unit) + 1)
+  return { start, end }
+}
+
+/* 预计算全局价格范围（仅当数据变化时重算） */
+let cachedPriceRange: { maxPrice: number; minPrice: number } | null = null
+let cachedDataLength = 0
+
+function getPriceRange(data: KLineData[]): { maxPrice: number; minPrice: number } {
+  if (cachedPriceRange && cachedDataLength === data.length) {
+    return cachedPriceRange
+  }
+
+  let maxPrice = -Infinity
+  let minPrice = Infinity
+  for (let i = 0; i < data.length; i++) {
+    const e = data[i]
+    if (e.high > maxPrice) maxPrice = e.high
+    if (e.low < minPrice) minPrice = e.low
+  }
+
+  cachedDataLength = data.length
+  cachedPriceRange = { maxPrice, minPrice }
+  return cachedPriceRange
+}
+
+/* 核心渲染：仅渲染可视区域 */
 function render() {
   const canvas = canvasRef.value
   const container = containerRef.value
@@ -53,47 +97,53 @@ function render() {
   const ctx = canvas.getContext('2d')
   if (!ctx) return
 
-  // 建议：props.data 在父组件已排序；这里为了保险也可以排序一遍（但会增加每帧开销）
   const kdata = props.data
-
   const rect = container.getBoundingClientRect()
   const viewWidth = Math.max(1, Math.round(rect.width))
   const height = Math.max(1, Math.round(rect.height))
+  tagLog('tag', height)
   const dpr = window.devicePixelRatio || 1
 
   const opt = option()
   const n = kdata.length
-  const contentWidth = Math.max(viewWidth, (opt.kGap + n * (opt.kWidth + opt.kGap)) / dpr)
 
-
-  // 让容器能横向滚动：canvas 撑开内容宽度
-  canvas.style.width = `${contentWidth}px`
+  /* Canvas 只保持视口大小，不再撑开整个内容 */
+  canvas.style.width = `${viewWidth}px`
   canvas.style.height = `${height}px`
-
-  canvas.width = Math.round(contentWidth * dpr)
+  canvas.width = Math.round(viewWidth * dpr)
   canvas.height = Math.round(height * dpr)
 
   const scrollLeft = container.scrollLeft
 
+  /* 计算可视范围 */
+  const { start, end } = getVisibleRange(scrollLeft, viewWidth, opt.kWidth, opt.kGap, n)
+
+  /* 计算全局价格范围（用于Y轴映射） */
+  const priceRange = getPriceRange(kdata)
+
   ctx.setTransform(1, 0, 0, 1, 0, 0)
   ctx.scale(dpr, dpr)
-  ctx.clearRect(0, 0, contentWidth, height)
+  ctx.clearRect(0, 0, viewWidth, height)
 
-  // 平移坐标系：视口跟随 scrollLeft
-  ctx.translate(-scrollLeft, 0)
+  /* 绘制偏移量：将K线坐标转换到canvas坐标系 */
+  const offsetX = -scrollLeft
 
-  // 画 K 线
-  kLineDraw(ctx, kdata, opt, height, dpr)
+  /* 画K线 - 仅可视范围 */
+  kLineDraw(ctx, kdata, opt, height, dpr, start, end, offsetX, priceRange)
 
-  // 画 MA（可配置开关）
-  if (props.showMA.ma5) drawMA5Line(ctx, kdata, opt, height, dpr)
-  if (props.showMA.ma10) drawMA10Line(ctx, kdata, opt, height, dpr)
-  if (props.showMA.ma20) drawMA20Line(ctx, kdata, opt, height, dpr)
+  /* 画MA - 仅可视范围 */
+  if (props.showMA.ma5) {
+    drawMA5Line(ctx, kdata, opt, height, dpr, start, end, offsetX, priceRange)
+  }
+  if (props.showMA.ma10) {
+    drawMA10Line(ctx, kdata, opt, height, dpr, start, end, offsetX, priceRange)
+  }
+  if (props.showMA.ma20) {
+    drawMA20Line(ctx, kdata, opt, height, dpr, start, end, offsetX, priceRange)
+  }
 }
 
-/**
- * rAF 节流：scroll/resize/data变化都用它触发
- */
+/* rAF节流 */
 function scheduleRender() {
   if (rafId !== null) cancelAnimationFrame(rafId)
   rafId = requestAnimationFrame(() => {
@@ -109,7 +159,12 @@ function scrollToRight() {
   scheduleRender()
 }
 
-// 暴露给父组件（可选）
+/* 数据变化时清除价格范围缓存 */
+function invalidatePriceCache() {
+  cachedPriceRange = null
+  cachedDataLength = 0
+}
+
 defineExpose({ scheduleRender, scrollToRight })
 
 onMounted(() => {
@@ -122,11 +177,10 @@ onUnmounted(() => {
   if (rafId !== null) cancelAnimationFrame(rafId)
 })
 
-// 数据或参数变化：重绘
 watch(
   () => [props.data, props.kWidth, props.kGap, props.yPaddingPx, props.showMA],
   async () => {
-    // 如果要自动滚到最右，等 DOM 更新再滚
+    invalidatePriceCache()
     if (props.autoScrollToRight) {
       await nextTick()
       scrollToRight()
@@ -140,17 +194,22 @@ watch(
 
 <style scoped>
 .chart-container {
-  width: 100%;
-  height: 400px;
-  background: white;
-
+  position: relative;
   overflow-x: auto;
   overflow-y: hidden;
+  height: 1000px;
+  min-height: 200px;
+}
 
-  -webkit-overflow-scrolling: touch;
+.scroll-content {
+  height: 100%;
+  min-height: inherit;
 }
 
 .chart-canvas {
+  position: sticky;
+  left: 0;
+  top: 0;
   display: block;
 }
 </style>

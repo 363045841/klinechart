@@ -15,7 +15,7 @@ onMounted(async () => {
   const raw = await getKlineDataDongCai({
     symbol: '601360',
     period: 'daily',
-    start_date: '20250501',
+    start_date: '20250101',
     end_date: '20251230',
     adjust: 'qfq',
   })
