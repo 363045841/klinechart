@@ -99,15 +99,16 @@ function render() {
 
   const kdata = props.data
   const rect = container.getBoundingClientRect()
+
   const viewWidth = Math.max(1, Math.round(rect.width))
   const height = Math.max(1, Math.round(rect.height))
-  tagLog('tag', height)
-  const dpr = window.devicePixelRatio || 1
+
+  // 限制最大 DPR 以防止内存爆炸和绘图卡顿
+  const dpr = Math.min(window.devicePixelRatio || 1, 3)  // 限制最大 DPR 为 3
 
   const opt = option()
   const n = kdata.length
 
-  /* Canvas 只保持视口大小，不再撑开整个内容 */
   canvas.style.width = `${viewWidth}px`
   canvas.style.height = `${height}px`
   canvas.width = Math.round(viewWidth * dpr)
@@ -115,32 +116,34 @@ function render() {
 
   const scrollLeft = container.scrollLeft
 
-  /* 计算可视范围 */
   const { start, end } = getVisibleRange(scrollLeft, viewWidth, opt.kWidth, opt.kGap, n)
-
-  /* 计算全局价格范围（用于Y轴映射） */
   const priceRange = getPriceRange(kdata)
 
+  /* 重置变换并缩放 */
   ctx.setTransform(1, 0, 0, 1, 0, 0)
   ctx.scale(dpr, dpr)
   ctx.clearRect(0, 0, viewWidth, height)
 
-  /* 绘制偏移量：将K线坐标转换到canvas坐标系 */
-  const offsetX = -scrollLeft
+  /* 保存状态，平移坐标系 */
+  ctx.save()
+  ctx.translate(-scrollLeft, 0)
 
-  /* 画K线 - 仅可视范围 */
-  kLineDraw(ctx, kdata, opt, height, dpr, start, end, offsetX, priceRange)
+  /* 画K线 */
+  kLineDraw(ctx, kdata, opt, height, dpr, start, end, priceRange)
 
-  /* 画MA - 仅可视范围 */
+  /* 画MA */
   if (props.showMA.ma5) {
-    drawMA5Line(ctx, kdata, opt, height, dpr, start, end, offsetX, priceRange)
+    drawMA5Line(ctx, kdata, opt, height, dpr, start, end, priceRange)
   }
   if (props.showMA.ma10) {
-    drawMA10Line(ctx, kdata, opt, height, dpr, start, end, offsetX, priceRange)
+    drawMA10Line(ctx, kdata, opt, height, dpr, start, end, priceRange)
   }
   if (props.showMA.ma20) {
-    drawMA20Line(ctx, kdata, opt, height, dpr, start, end, offsetX, priceRange)
+    drawMA20Line(ctx, kdata, opt, height, dpr, start, end, priceRange)
   }
+
+  /* 恢复状态 */
+  ctx.restore()
 }
 
 /* rAF节流 */
@@ -197,8 +200,7 @@ watch(
   position: relative;
   overflow-x: auto;
   overflow-y: hidden;
-  height: 1000px;
-  min-height: 200px;
+  height: 100%;
 }
 
 .scroll-content {

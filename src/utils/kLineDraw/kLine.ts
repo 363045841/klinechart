@@ -18,6 +18,7 @@ const DOWN_COLOR = 'rgba(3, 123, 102, 1)'
 
 /**
  * K线图绘制 - 仅渲染指定索引范围
+ * 调用前需已 ctx.translate(-scrollLeft, 0)
  */
 export function kLineDraw(
   ctx: CanvasRenderingContext2D,
@@ -27,20 +28,17 @@ export function kLineDraw(
   dpr: number = 1,
   startIndex: number = 0,
   endIndex: number = data.length,
-  offsetX: number = 0,
   priceRange?: PriceRange,
 ) {
   if (data.length === 0) return
 
   const height = logicHeight
 
-  /* 处理上下留白 */
   const wantPad = option.yPaddingPx ?? 0
   const pad = Math.max(0, Math.min(wantPad, Math.floor(height / 2) - 1))
   const paddingTop = pad
   const paddingBottom = pad
 
-  /* 价格范围 */
   let maxPrice: number
   let minPrice: number
 
@@ -61,7 +59,6 @@ export function kLineDraw(
 
   const unit = option.kWidth + option.kGap
 
-  /* 仅遍历可视范围 */
   for (let i = startIndex; i < endIndex && i < data.length; i++) {
     const e = data[i]
     if (!e) continue
@@ -71,19 +68,17 @@ export function kLineDraw(
     const openY = priceToY(e.open, maxPrice, minPrice, height, paddingTop, paddingBottom)
     const closeY = priceToY(e.close, maxPrice, minPrice, height, paddingTop, paddingBottom)
 
-    /* 世界坐标 + 偏移 = 画布坐标 */
-    const rectX = option.kGap + i * unit + offsetX
+    /* 直接用世界坐标，translate 已处理偏移 */
+    const rectX = option.kGap + i * unit
     const rectY = Math.min(openY, closeY)
     const rectHeight = Math.max(Math.abs(openY - closeY), 2 / dpr)
 
     const trend: kLineTrend = getKLineTrend(e)
     const color = trend === 'up' ? UP_COLOR : DOWN_COLOR
 
-    /* 实体 */
     ctx.fillStyle = color
     ctx.fillRect(rectX, rectY, option.kWidth, rectHeight)
 
-    /* 影线 */
     ctx.strokeStyle = color
     ctx.lineWidth = 2 / dpr
     const cx = rectX + option.kWidth / 2

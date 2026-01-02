@@ -22,3 +22,5 @@ onMounted(async () => {
   kdata.value = toKLineData(raw) // 这里就排序好
 })
 </script>
+
+<style></style>
