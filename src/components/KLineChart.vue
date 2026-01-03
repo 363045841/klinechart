@@ -1,5 +1,7 @@
 <template>
-  <div class="chart-container" ref="containerRef" @scroll.passive="scheduleRender">
+  <div class="chart-container" :class="{ 'is-dragging': isDragging }" ref="containerRef"
+    @scroll.passive="scheduleRender" @mousedown="onMouseDown" @mousemove="onMouseMove" @mouseup="onMouseUp"
+    @mouseleave="onMouseUp">
     <div class="scroll-content" :style="{ width: totalWidth + 'px' }">
       <canvas class="chart-canvas" ref="canvasRef"></canvas>
     </div>
@@ -38,6 +40,40 @@ const canvasRef = ref<HTMLCanvasElement | null>(null)
 const containerRef = ref<HTMLDivElement | null>(null)
 
 let rafId: number | null = null
+
+/* ========== 拖拽相关 ========== */
+const isDragging = ref(false)
+let dragStartX = 0
+let scrollStartX = 0
+
+function onMouseDown(e: MouseEvent) {
+  // 只响应左键
+  if (e.button !== 0) return
+
+  const container = containerRef.value
+  if (!container) return
+
+  isDragging.value = true
+  dragStartX = e.clientX
+  scrollStartX = container.scrollLeft
+
+  // 防止选中文字
+  e.preventDefault()
+}
+
+function onMouseMove(e: MouseEvent) {
+  if (!isDragging.value) return
+
+  const container = containerRef.value
+  if (!container) return
+
+  const deltaX = dragStartX - e.clientX
+  container.scrollLeft = scrollStartX + deltaX
+}
+
+function onMouseUp() {
+  isDragging.value = false
+}
 
 /* 计算总宽度，用于撑开滚动区域 */
 const totalWidth = computed(() => {
@@ -201,6 +237,26 @@ watch(
   overflow-x: auto;
   overflow-y: hidden;
   height: 100%;
+  /* 隐藏滚动条但保留滚动功能 */
+  scrollbar-width: none;
+  /* Firefox */
+  -ms-overflow-style: none;
+  /* IE/Edge */
+}
+
+/* Chrome/Safari 隐藏滚动条 */
+.chart-container::-webkit-scrollbar {
+  display: none;
+}
+
+/* 默认显示可拖拽光标 */
+.chart-container:hover {
+  cursor: grab;
+}
+
+/* 拖拽时显示抓取光标 - 写在后面，优先级更高 */
+.chart-container:active {
+  cursor: grabbing;
 }
 
 .scroll-content {
