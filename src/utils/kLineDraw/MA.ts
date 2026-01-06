@@ -3,9 +3,9 @@ import { priceToY } from '../priceToY'
 import type { drawOption, PriceRange } from './kLine'
 import { alignToPhysicalPixelCenter } from './pixelAlign'
 
-const MA5_COLOR = 'rgba(255, 193, 37, 1)'
-const MA10_COLOR = 'rgba(190, 131, 12, 1)'
-const MA20_COLOR = 'rgba(69, 112, 249, 1)'
+export const MA5_COLOR = 'rgba(255, 193, 37, 1)'
+export const MA10_COLOR = 'rgba(190, 131, 12, 1)'
+export const MA20_COLOR = 'rgba(69, 112, 249, 1)'
 
 /**
  * 通用 MA 线绘制函数 - 逻辑像素坐标系
@@ -43,6 +43,7 @@ function drawMALine(
     minPrice = Infinity
     for (let i = startIndex; i < endIndex && i < data.length; i++) {
       const e = data[i]
+      if (!e) continue
       if (e.high > maxPrice) maxPrice = e.high
       if (e.low < minPrice) minPrice = e.low
     }
@@ -65,7 +66,9 @@ function drawMALine(
     // 计算 MA 值
     let sum = 0
     for (let j = 0; j < period; j++) {
-      sum += data[i - j].close
+      const prev = data[i - j]
+      if (!prev) return
+      sum += prev.close
     }
     const maValue = sum / period
 

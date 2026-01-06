@@ -34,7 +34,7 @@ function drawPriceMarker(
 ) {
   const text = price.toFixed(2)
   const padding = 4
-  const lineLength = 20
+  const lineLength = 30
   const dotRadius = 2
 
   // 使用填充矩形绘制水平引导线
@@ -185,12 +185,12 @@ export function kLineDraw(
 
     // 绘制最高价标记
     if (i === maxPriceIndex) {
-      drawPriceMarker(ctx, cx, highY, visibleMaxPrice, 'high', dpr)
+      drawPriceMarker(ctx, cx, highY, visibleMaxPrice, dpr)
     }
 
     // 绘制最低价标记
     if (i === minPriceIndex) {
-      drawPriceMarker(ctx, cx, lowY, visibleMinPrice, 'low', dpr)
+      drawPriceMarker(ctx, cx, lowY, visibleMinPrice, dpr)
     }
   }
 }
