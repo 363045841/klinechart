@@ -1,5 +1,5 @@
 import type { KLineData } from '@/types/price'
-import { priceToY } from '../priceToY'
+import { priceToY, yToPrice } from '../priceToY'
 import { alignToPhysicalPixelCenter, roundToPhysicalPixel } from './pixelAlign'
 
 export interface PriceAxisOptions {
@@ -121,6 +121,160 @@ export interface LastPriceLineOptions {
     yPaddingPx?: number
     dpr: number
     color?: string
+}
+
+export interface CrosshairPriceLabelOptions {
+    x: number
+    y: number
+    width: number
+    height: number
+    /** 十字线的 y（相对该 canvas 的逻辑像素坐标） */
+    crosshairY: number
+    priceRange: { maxPrice: number; minPrice: number }
+    yPaddingPx?: number
+    dpr: number
+    bgColor?: string
+    textColor?: string
+    fontSize?: number
+    paddingX?: number
+}
+
+export interface CrosshairTimeLabelOptions {
+    x: number
+    y: number
+    width: number
+    height: number
+    /** 十字线的 x（相对该 canvas 的逻辑像素坐标） */
+    crosshairX: number
+    /** 命中的交易日时间戳（毫秒） */
+    timestamp: number
+    dpr: number
+    bgColor?: string
+    textColor?: string
+    fontSize?: number
+    paddingX?: number
+    paddingY?: number
+}
+
+function formatYMDShanghai(ts: number): string {
+    // 按上海时区格式化，避免不同时区出现日期偏移
+    const parts = new Intl.DateTimeFormat('zh-CN', {
+        timeZone: 'Asia/Shanghai',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    })
+        .formatToParts(new Date(ts))
+        .reduce<Record<string, string>>((acc, p) => {
+            if (p.type !== 'literal') acc[p.type] = p.value
+            return acc
+        }, {})
+
+    return `${parts.year}-${parts.month}-${parts.day}`
+}
+
+/**
+ * 在底部时间轴上绘制“十字线日期标签”
+ * 说明：该函数假设时间轴背景/刻度已绘制完（即 drawTimeAxis 之后调用）。
+ */
+export function drawCrosshairTimeLabel(ctx: CanvasRenderingContext2D, opts: CrosshairTimeLabelOptions) {
+    const {
+        x,
+        y,
+        width,
+        height,
+        crosshairX,
+        timestamp,
+        dpr,
+        bgColor = 'rgba(0,0,0,0.55)',
+        textColor = 'rgba(255,255,255,0.92)',
+        fontSize = 12,
+        paddingX = 8,
+        paddingY = 4,
+    } = opts
+
+    const text = formatYMDShanghai(timestamp)
+
+    ctx.save()
+    ctx.font = `${fontSize}px -apple-system,BlinkMacSystemFont,Trebuchet MS,Roboto,Ubuntu,sans-serif`
+    ctx.textBaseline = 'middle'
+    ctx.textAlign = 'center'
+
+    const tw = Math.ceil(ctx.measureText(text).width)
+    const rectW = Math.min(width, tw + paddingX * 2)
+    const rectH = Math.min(height, fontSize + paddingY * 2)
+
+    const centerX = Math.min(Math.max(crosshairX, x + rectW / 2), x + width - rectW / 2)
+    const centerY = y + height / 2
+
+    const rectX = centerX - rectW / 2
+    const rectY = centerY - rectH / 2
+
+    ctx.fillStyle = bgColor
+    ctx.fillRect(
+        roundToPhysicalPixel(rectX, dpr),
+        roundToPhysicalPixel(rectY, dpr),
+        roundToPhysicalPixel(rectW, dpr),
+        roundToPhysicalPixel(rectH, dpr),
+    )
+
+    ctx.fillStyle = textColor
+    ctx.fillText(text, roundToPhysicalPixel(centerX, dpr), roundToPhysicalPixel(centerY, dpr))
+
+    ctx.restore()
+}
+
+/**
+ * 在右侧价格轴上绘制“十字线价格标签”
+ * 说明：该函数假设价格轴背景/刻度已绘制完（即 drawPriceAxis 之后调用）。
+ */
+export function drawCrosshairPriceLabel(ctx: CanvasRenderingContext2D, opts: CrosshairPriceLabelOptions) {
+    const {
+        x,
+        y,
+        width,
+        height,
+        crosshairY,
+        priceRange,
+        yPaddingPx = 0,
+        dpr,
+        bgColor = 'rgba(0,0,0,0.55)',
+        textColor = 'rgba(255,255,255,0.92)',
+        fontSize = 12,
+        paddingX = 12,
+    } = opts
+
+    const pad = Math.max(0, Math.min(yPaddingPx, Math.floor(height / 2) - 1))
+    const { maxPrice, minPrice } = priceRange
+
+    // 将 y 反算回价格
+    const price = yToPrice(crosshairY - y, maxPrice, minPrice, height, pad, pad)
+    const text = price.toFixed(2)
+
+    ctx.save()
+    ctx.font = `${fontSize}px -apple-system,BlinkMacSystemFont,Trebuchet MS,Roboto,Ubuntu,sans-serif`
+    ctx.textBaseline = 'middle'
+    ctx.textAlign = 'left'
+
+    const textMetrics = ctx.measureText(text)
+    const textH = fontSize + 6
+    const textW = Math.ceil(textMetrics.width + paddingX * 2)
+    const rectH = textH
+    const rectW = Math.min(width, textW)
+
+    const yy = Math.min(Math.max(crosshairY, y + rectH / 2), y + height - rectH / 2)
+    const rectY = yy - rectH / 2
+
+    // 背景条（靠左）
+    ctx.fillStyle = bgColor
+    ctx.fillRect(roundToPhysicalPixel(x, dpr), roundToPhysicalPixel(rectY, dpr), roundToPhysicalPixel(rectW, dpr), roundToPhysicalPixel(rectH, dpr))
+
+    // 文字
+    ctx.fillStyle = textColor
+    const tx = x + paddingX
+    ctx.fillText(text, roundToPhysicalPixel(tx, dpr), roundToPhysicalPixel(yy, dpr))
+
+    ctx.restore()
 }
 
 /** 绘制“最新价水平虚线”（画在 plotCanvas 的 world 坐标系：需在 translate(-scrollLeft,0) 之后调用） */
