@@ -1,6 +1,7 @@
 import type { KLineData } from '@/types/price'
 import { priceToY, yToPrice } from '../priceToY'
 import { alignToPhysicalPixelCenter, roundToPhysicalPixel } from './pixelAlign'
+import { tagLog } from '../logger'
 
 export interface PriceAxisOptions {
     x: number
@@ -64,7 +65,14 @@ export function drawPriceAxis(ctx: CanvasRenderingContext2D, opts: PriceAxisOpti
 
     for (let i = 0; i < Math.max(2, ticks); i++) {
         const p = range === 0 ? maxPrice : maxPrice - step * i
-        const yy = priceToY(p, maxPrice, minPrice, height, pad, pad) + y
+        // 统一对 y 做一次四舍五入，减少与 gridLines 的 1px 级误差
+        const yy = Math.round(priceToY(p, maxPrice, minPrice, height, pad, pad) + y)
+        tagLog(
+            'axis',
+            {
+                p, maxPrice, minPrice, height, pad, "pad2": pad, yy, "text": p.toFixed(2)
+            },
+        )
 
         // 刻度短线
         ctx.strokeStyle = lineColor

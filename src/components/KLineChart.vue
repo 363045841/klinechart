@@ -27,38 +27,54 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick, shallowRef } from 'vue'
 import type { KLineData } from '@/types/price'
 import KLineTooltip from './KLineTooltip.vue'
-import { useKLineRenderer, type MAFlags as RendererMAFlags } from '@/composables/useKLineRenderer'
-import { useKLineInteraction } from '@/composables/useKLineInteraction'
+import { Chart, type PaneSpec } from '@/core/chart'
+import { CandleRenderer } from '@/core/renderers/candle'
+import { GridLinesRenderer } from '@/core/renderers/gridLines'
+import { LastPriceLineRenderer } from '@/core/renderers/lastPrice'
+import { createMARenderer } from '@/core/renderers/ma'
+import { ExtremaMarkersRenderer } from '@/core/renderers/extremaMarkers'
 
-type MAFlags = RendererMAFlags
+type MAFlags = {
+  ma5?: boolean
+  ma10?: boolean
+  ma20?: boolean
+}
 
-const props = withDefaults(defineProps<{
-  data: KLineData[]
-  kWidth?: number
-  kGap?: number
-  yPaddingPx?: number
-  showMA?: MAFlags
-  autoScrollToRight?: boolean
-  minKWidth?: number
-  maxKWidth?: number
-  /** 右侧价格轴宽度 */
-  rightAxisWidth?: number
-  /** 底部时间轴高度 */
-  bottomAxisHeight?: number
-}>(), {
-  kWidth: 10,
-  kGap: 2,
-  yPaddingPx: 40,
-  showMA: () => ({ ma5: true, ma10: true, ma20: true }),
-  autoScrollToRight: true,
-  minKWidth: 2,
-  maxKWidth: 50,
-  rightAxisWidth: 70,
-  bottomAxisHeight: 24,
-})
+const props = withDefaults(
+  defineProps<{
+    data: KLineData[]
+    kWidth?: number
+    kGap?: number
+    yPaddingPx?: number
+    showMA?: MAFlags
+    autoScrollToRight?: boolean
+    minKWidth?: number
+    maxKWidth?: number
+    /** 右侧价格轴宽度 */
+    rightAxisWidth?: number
+    /** 底部时间轴高度 */
+    bottomAxisHeight?: number
+
+    /** Pane 高度比例（主/副），默认 [0.85, 0.15] */
+    paneRatios?: [number, number]
+  }>(),
+  {
+    kWidth: 10,
+    kGap: 2,
+    yPaddingPx: 40,
+    showMA: () => ({ ma5: true, ma10: true, ma20: true }),
+    autoScrollToRight: true,
+    minKWidth: 2,
+    maxKWidth: 50,
+    rightAxisWidth: 70,
+    bottomAxisHeight: 24,
+
+    paneRatios: () => [0.85, 0.15],
+  },
+)
 
 const plotCanvasRef = ref<HTMLCanvasElement | null>(null)
 const yAxisCanvasRef = ref<HTMLCanvasElement | null>(null)
@@ -70,63 +86,84 @@ const containerRef = ref<HTMLDivElement | null>(null)
 const currentKWidth = ref(props.kWidth)
 const currentKGap = ref(props.kGap)
 
-// 计算初始比例
-const initialRatio = props.kGap / props.kWidth
-
-const rightAxisWidthRef = computed(() => props.rightAxisWidth)
-const bottomAxisHeightRef = computed(() => props.bottomAxisHeight)
-const yPaddingPxRef = computed(() => props.yPaddingPx ?? 0)
-
 /* ========== 十字线（鼠标悬停位置） ========== */
-const crosshairPos = ref<{ x: number; y: number } | null>(null)
-const crosshairIndex = ref<number | null>(null)
+const chartRef = shallowRef<Chart | null>(null)
 
-const renderer = useKLineRenderer({
-  plotCanvasRef,
-  yAxisCanvasRef,
-  xAxisCanvasRef,
-  canvasLayerRef,
-  containerRef,
-  getData: () => props.data,
-  getOption: () => ({
-    kWidth: currentKWidth.value,
-    kGap: currentKGap.value,
-    yPaddingPx: props.yPaddingPx,
-  }),
-  getShowMA: () => props.showMA,
-  rightAxisWidth: rightAxisWidthRef,
-  bottomAxisHeight: bottomAxisHeightRef,
-  crosshairPos,
-  crosshairIndex,
-})
-
-const scheduleRender = renderer.scheduleRender
+function scheduleRender() {
+  chartRef.value?.scheduleDraw()
+}
 
 const tooltipRef = ref<HTMLDivElement | null>(null)
 
 function setTooltipEl(el: HTMLDivElement | null) {
   tooltipRef.value = el
+  if (!el) return
+  const r = el.getBoundingClientRect()
+  chartRef.value?.interaction.setTooltipSize({
+    width: Math.max(180, Math.round(r.width)),
+    height: Math.max(80, Math.round(r.height)),
+  })
 }
 
-const interaction = useKLineInteraction({
-  containerRef,
-  tooltipRef,
-  getData: () => props.data,
-  crosshairPos,
-  crosshairIndex,
-  kWidth: currentKWidth,
-  kGap: currentKGap,
-  minKWidth: props.minKWidth,
-  maxKWidth: props.maxKWidth,
-  initialRatio,
-  rightAxisWidth: rightAxisWidthRef,
-  bottomAxisHeight: bottomAxisHeightRef,
-  yPaddingPx: yPaddingPxRef,
-  scheduleRender,
-  getViewport: renderer.getLastViewport,
-})
+// ===== 交互状态（先保留最小：拖拽时样式） =====
+const isDragging = ref(false)
 
-const { isDragging, hoveredIndex, hovered, tooltipPos, onMouseDown, onMouseMove, onMouseUp, onMouseLeave, onScroll, onWheel } = interaction
+// tooltip/hover 必须是 Vue 可追踪的响应式状态（Chart 内部普通属性 Vue 不会自动追踪）
+const hoveredIdx = ref<number | null>(null)
+const tooltipPosition = ref({ x: 0, y: 0 })
+
+const hovered = computed(() => {
+  const idx = hoveredIdx.value
+  if (typeof idx !== 'number') return null
+  return props.data?.[idx] ?? null
+})
+const hoveredIndex = computed(() => hoveredIdx.value)
+const tooltipPos = computed(() => tooltipPosition.value)
+
+function syncHoverState() {
+  const interaction = chartRef.value?.interaction
+  if (!interaction) {
+    hoveredIdx.value = null
+    return
+  }
+
+  hoveredIdx.value = interaction.hoveredIndex ?? null
+  const pos = interaction.tooltipPos
+  if (pos) tooltipPosition.value = { x: pos.x, y: pos.y }
+}
+
+function onMouseDown(e: MouseEvent) {
+  isDragging.value = true
+  chartRef.value?.interaction.onMouseDown(e)
+  syncHoverState()
+}
+
+function onMouseMove(e: MouseEvent) {
+  chartRef.value?.interaction.onMouseMove(e)
+  syncHoverState()
+}
+
+function onMouseUp() {
+  isDragging.value = false
+  chartRef.value?.interaction.onMouseUp()
+  syncHoverState()
+}
+
+function onMouseLeave() {
+  isDragging.value = false
+  chartRef.value?.interaction.onMouseLeave()
+  hoveredIdx.value = null
+}
+
+function onScroll() {
+  chartRef.value?.interaction.onScroll()
+  syncHoverState()
+}
+
+function onWheel(e: WheelEvent) {
+  chartRef.value?.interaction.onWheel(e)
+  syncHoverState()
+}
 
 /* 计算总宽度：绑图区域宽度 + 右侧轴宽度 */
 const totalWidth = computed(() => {
@@ -134,6 +171,8 @@ const totalWidth = computed(() => {
   const plotWidth = currentKGap.value + n * (currentKWidth.value + currentKGap.value)
   return plotWidth + props.rightAxisWidth
 })
+
+// 注意：缩放时由 Chart.setOnZoomChange 回调负责同步 kWidth/kGap + scrollLeft，避免重复 clamp。
 
 function scrollToRight() {
   const container = containerRef.value
@@ -145,13 +184,82 @@ function scrollToRight() {
 defineExpose({ scheduleRender, scrollToRight })
 
 onMounted(() => {
-  window.addEventListener('resize', scheduleRender, { passive: true })
-  scheduleRender()
+  const container = containerRef.value
+  const canvasLayer = canvasLayerRef.value
+  const plotCanvas = plotCanvasRef.value
+  const yAxisCanvas = yAxisCanvasRef.value
+  const xAxisCanvas = xAxisCanvasRef.value
+  if (!container || !canvasLayer || !plotCanvas || !yAxisCanvas || !xAxisCanvas) return
+
+  const panes: PaneSpec[] = [
+    { id: 'main', ratio: props.paneRatios[0] },
+    { id: 'sub', ratio: props.paneRatios[1] },
+  ]
+
+  const chart = new Chart(
+    { container, canvasLayer, plotCanvas, yAxisCanvas, xAxisCanvas },
+    {
+      kWidth: currentKWidth.value,
+      kGap: currentKGap.value,
+      yPaddingPx: props.yPaddingPx,
+      rightAxisWidth: props.rightAxisWidth,
+      bottomAxisHeight: props.bottomAxisHeight,
+      minKWidth: props.minKWidth,
+      maxKWidth: props.maxKWidth,
+      panes,
+
+      // 主/副图之间真实留白，形成视觉断开
+      paneGap: 8,
+    },
+  )
+
+  // 缩放回调：同步 kWidth/kGap -> 等 DOM 更新 scrollWidth -> 再设置 scrollLeft
+  chart.setOnZoomChange(async (kWidth, kGap, targetScrollLeft) => {
+    currentKWidth.value = kWidth
+    currentKGap.value = kGap
+
+    // 1) 等 Vue 更新 scroll-content width
+    await nextTick()
+    // 2) 再等一帧，确保浏览器完成布局并刷新 scrollWidth
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+
+    const c = containerRef.value
+    if (!c) return
+    const maxScrollLeft = Math.max(0, c.scrollWidth - c.clientWidth)
+    c.scrollLeft = Math.min(Math.max(0, targetScrollLeft), maxScrollLeft)
+    scheduleRender()
+  })
+
+  // 主/副 pane：先恢复网格 + 最新价虚线 + 蜡烛图（副图后续替换为 MACD renderer）
+  chart.setPaneRenderers('main', [
+    GridLinesRenderer,
+    LastPriceLineRenderer,
+    CandleRenderer,
+    ExtremaMarkersRenderer,
+    createMARenderer(props.showMA),
+  ])
+  // 副图暂不画任何数据：后续接入 MACD/成交量等 renderer
+  chart.setPaneRenderers('sub', [GridLinesRenderer])
+
+  chartRef.value = chart
+  chart.updateData(props.data)
+  chart.resize()
+
+  const onResize = () => chart.resize()
+  window.addEventListener('resize', onResize, { passive: true })
+
+    // 绑定到实例上，unmount 时移除（通过闭包变量）
+    ; (chart as any).__onResize = onResize
 })
 
 onUnmounted(() => {
-  window.removeEventListener('resize', scheduleRender)
-  renderer.destroy()
+  const chart = chartRef.value
+  if (chart) {
+    const onResize = (chart as any).__onResize as ((this: Window, ev: UIEvent) => any) | undefined
+    if (onResize) window.removeEventListener('resize', onResize)
+    chart.destroy()
+  }
+  chartRef.value = null
 })
 
 watch(
@@ -159,12 +267,17 @@ watch(
   ([newWidth, newGap]) => {
     if (typeof newWidth === 'number') currentKWidth.value = newWidth
     if (typeof newGap === 'number') currentKGap.value = newGap
-  }
+
+    chartRef.value?.updateOptions({ kWidth: currentKWidth.value, kGap: currentKGap.value })
+  },
 )
 
 watch(
   () => [props.data, props.yPaddingPx, props.showMA],
   async () => {
+    chartRef.value?.updateOptions({ yPaddingPx: props.yPaddingPx })
+    chartRef.value?.updateData(props.data)
+
     if (props.autoScrollToRight) {
       await nextTick()
       scrollToRight()

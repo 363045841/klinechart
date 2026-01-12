@@ -19,6 +19,18 @@ export default defineConfig({
     },
   },
 
+  // 让手机/局域网设备可以访问本机 dev server
+  // 同时通过 Vite proxy 转发 /api -> AKTools(本机 8080)，避免浏览器 CORS 问题
+  server: {
+    host: '0.0.0.0',
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:8080',
+        changeOrigin: true,
+      },
+    },
+  },
+
   build: {
     lib: {
       entry: fileURLToPath(new URL('./src/index.ts', import.meta.url)),

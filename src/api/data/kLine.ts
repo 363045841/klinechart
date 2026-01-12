@@ -25,8 +25,10 @@ interface KLineDailyDongCaiResponseChinese {
   换手率: number
 }
 
-
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8080'
+// 注意：为了支持“手机访问本机 Vite dev server，并由 Vite proxy 转发到 AKTools”
+// 这里默认使用相对路径 `/api/...`，这样请求会落到当前页面同源（例如 http://<PC-IP>:5173/api/...）
+// 再由 vite.config.ts 的 server.proxy 转发到 http://127.0.0.1:8080。
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
 const API_PATH = import.meta.env.VITE_API_PATH || '/api/public/stock_zh_a_hist'
 const url = `${BASE_URL}${API_PATH}`
 

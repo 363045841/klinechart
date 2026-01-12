@@ -69,9 +69,49 @@ pip install aktools
 #### 启动 AKTools 数据服务
 
 方法一：使用 uv 直接运行 AKTools
+
 ```bash
 uv run python -m aktools
 ```
+
+方法一（推荐）：通过本项目脚本启动（会自动切换到上级目录的 `aktoolshttp/`）
+
+```bash
+pnpm aktools
+```
+
+#### 手机访问本机（开发模式）并调用 AKTools API（推荐）
+
+如果你希望用手机浏览器访问本机正在运行的 `pnpm dev` 页面，同时前端还能调用本机的 AKTools API，推荐使用 **Vite 代理**（避免 CORS，且手机不需要直连 8080）。
+
+本项目已在 `vite.config.ts` 配置：
+
+- dev server 监听 `0.0.0.0`
+- 代理转发：`/api` -> `http://127.0.0.1:8080`
+
+启动步骤：
+
+1. 启动 AKTools（本机 8080）：
+
+   ```bash
+   pnpm aktools
+   ```
+
+2. 启动前端 dev server（允许局域网访问）：
+
+   ```bash
+   pnpm dev:lan
+   ```
+
+3. 查找本机局域网 IP（例如 `192.168.1.23`），手机浏览器访问：
+
+   ```
+   http://192.168.1.23:5173
+   ```
+
+> 说明：前端请求路径保持 `VITE_API_PATH=/api/public/stock_zh_a_hist`，浏览器请求会先到 5173，再由 Vite 代理到本机 8080，因此通常不会遇到跨域问题。
+
+如果你之前在 `.env` 写死了 `VITE_API_BASE_URL=http://127.0.0.1:8080`，手机端会把 `127.0.0.1` 解析成“手机自己”，从而导致 API 连接失败。此时请把 `VITE_API_BASE_URL` 留空（或删除该行），让前端走相对路径并交给 Vite 代理。
 
 方法二：创建自定义后端服务
 除了使用 AKTools 自带的服务外，你也可以根据需要创建自定义的后端服务来处理数据。
@@ -94,8 +134,8 @@ import vue from '@vitejs/plugin-vue'
 export default defineConfig({
   plugins: [vue()],
   define: {
-    'process.env': process.env
-  }
+    'process.env': process.env,
+  },
 })
 ```
 
@@ -105,18 +145,18 @@ K 线数据需要包含以下字段：
 
 ```ts
 interface KLineDailyDongCaiResponse {
-  日期: string          // 日期
-  股票代码: string      // 股票代码
-  开盘: number          // 开盘价
-  收盘: number          // 收盘价
-  最高: number          // 最高价
-  最低: number          // 最低价
-  成交量: number        // 成交量
-  成交额: number        // 成交额
-  振幅: number          // 振幅
-  涨跌幅: number        // 涨跌幅
-  涨跌额: number        // 涨跌额
-  换手率: number        // 换手率
+  日期: string // 日期
+  股票代码: string // 股票代码
+  开盘: number // 开盘价
+  收盘: number // 收盘价
+  最高: number // 最高价
+  最低: number // 最低价
+  成交量: number // 成交量
+  成交额: number // 成交额
+  振幅: number // 振幅
+  涨跌幅: number // 涨跌幅
+  涨跌额: number // 涨跌额
+  换手率: number // 换手率
 }
 ```
 
@@ -138,13 +178,13 @@ pnpm dev
 
 ```vue
 <template>
-  <KLineChart 
-    :data="klineData" 
-    :kWidth="10" 
-    :kGap="2" 
-    :yPaddingPx="60" 
+  <KLineChart
+    :data="klineData"
+    :kWidth="10"
+    :kGap="2"
+    :yPaddingPx="60"
     :showMA="{ ma5: true, ma10: true, ma20: true }"
-    :autoScrollToRight="true" 
+    :autoScrollToRight="true"
   />
 </template>
 
@@ -158,11 +198,11 @@ const klineData = ref<KLineData[]>([])
 
 onMounted(async () => {
   const raw = await getKlineDataDongCai({
-    symbol: '601360',  // 三六零股票代码
+    symbol: '601360', // 三六零股票代码
     period: 'daily',
     start_date: '20250501',
     end_date: '20251230',
-    adjust: 'qfq',     // 前复权
+    adjust: 'qfq', // 前复权
   })
   klineData.value = toKLineData(raw) // 转换并排序数据
 })
@@ -171,14 +211,14 @@ onMounted(async () => {
 
 ### 组件属性
 
-| 属性 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| data | KLineData[] | [] | K 线数据数组 |
-| kWidth | number | 10 | K 线实体宽度 |
-| kGap | number | 2 | K 线间距 |
-| yPaddingPx | number | 60 | Y 轴上下留白像素 |
-| showMA | MAFlags | { ma5: true, ma10: true, ma20: true } | 是否显示移动平均线 |
-| autoScrollToRight | boolean | true | 数据更新后是否自动滚动到最右侧 |
+| 属性              | 类型        | 默认值                                | 说明                           |
+| ----------------- | ----------- | ------------------------------------- | ------------------------------ |
+| data              | KLineData[] | []                                    | K 线数据数组                   |
+| kWidth            | number      | 10                                    | K 线实体宽度                   |
+| kGap              | number      | 2                                     | K 线间距                       |
+| yPaddingPx        | number      | 60                                    | Y 轴上下留白像素               |
+| showMA            | MAFlags     | { ma5: true, ma10: true, ma20: true } | 是否显示移动平均线             |
+| autoScrollToRight | boolean     | true                                  | 数据更新后是否自动滚动到最右侧 |
 
 ## 性能优化
 
@@ -192,6 +232,7 @@ onMounted(async () => {
 - Node.js: ^20.19.0 || >=22.12.0
 - pnpm: 包管理器
 - Python: 用于运行 AKTools 服务（可选）
+- uv: Python 包与运行器（用于 `pnpm aktools`，可选但推荐）
 
 ## 构建与部署
 
@@ -217,12 +258,12 @@ pnpm preview
 
 ```ts
 interface KLineDailyDongCaiRequest {
-  symbol: string          // 股票代码
-  period: 'daily' | 'weekly' | 'monthly'  // 周期
-  start_date: string      // 开始日期，格式：YYYYMMDD
-  end_date: string        // 结束日期，格式：YYYYMMDD
-  adjust?: 'qfq' | 'hfq'  // 复权方式，qfq: 前复权, hfq: 后复权
-  timeout?: number        // 超时时间（秒）
+  symbol: string // 股票代码
+  period: 'daily' | 'weekly' | 'monthly' // 周期
+  start_date: string // 开始日期，格式：YYYYMMDD
+  end_date: string // 结束日期，格式：YYYYMMDD
+  adjust?: 'qfq' | 'hfq' // 复权方式，qfq: 前复权, hfq: 后复权
+  timeout?: number // 超时时间（秒）
 }
 ```
 

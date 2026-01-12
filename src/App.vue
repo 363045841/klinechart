@@ -16,7 +16,7 @@ onMounted(async () => {
     symbol: '601360',
     period: 'daily',
     start_date: '20250101',
-    end_date: '20260106',
+    end_date: '20260113',
     adjust: 'qfq',
   })
   kdata.value = toKLineData(raw) // 这里就排序好
