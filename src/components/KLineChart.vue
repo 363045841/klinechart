@@ -3,6 +3,7 @@
   <div class="chart-wrapper">
     <div class="chart-container" :class="{ 'is-dragging': isDragging }" ref="containerRef" @scroll.passive="onScroll"
       @mousedown="onMouseDown" @mousemove="onMouseMove" @mouseup="onMouseUp" @mouseleave="onMouseLeave"
+      @pointerdown="onPointerDown" @pointermove="onPointerMove" @pointerup="onPointerUp" @pointerleave="onPointerLeave"
       @wheel.prevent="onWheel">
       <!-- scroll-content 负责撑开横向滚动宽度，并承载 sticky 的画布层 -->
       <div class="scroll-content" :style="{ width: totalWidth + 'px' }">
@@ -138,8 +139,20 @@ function onMouseDown(e: MouseEvent) {
   syncHoverState()
 }
 
+function onPointerDown(e: PointerEvent) {
+  // 触屏：手指一接触屏幕就触发十字线（避免必须长按才触发）
+  isDragging.value = true
+  chartRef.value?.interaction.onPointerDown(e)
+  syncHoverState()
+}
+
 function onMouseMove(e: MouseEvent) {
   chartRef.value?.interaction.onMouseMove(e)
+  syncHoverState()
+}
+
+function onPointerMove(e: PointerEvent) {
+  chartRef.value?.interaction.onPointerMove(e)
   syncHoverState()
 }
 
@@ -149,9 +162,21 @@ function onMouseUp() {
   syncHoverState()
 }
 
+function onPointerUp(e: PointerEvent) {
+  isDragging.value = false
+  chartRef.value?.interaction.onPointerUp(e)
+  syncHoverState()
+}
+
 function onMouseLeave() {
   isDragging.value = false
   chartRef.value?.interaction.onMouseLeave()
+  hoveredIdx.value = null
+}
+
+function onPointerLeave(e: PointerEvent) {
+  isDragging.value = false
+  chartRef.value?.interaction.onPointerLeave(e)
   hoveredIdx.value = null
 }
 
@@ -307,6 +332,13 @@ watch(
   width: 80%;
   scrollbar-width: none;
   -ms-overflow-style: none;
+
+  /* ===== 移动端：屏蔽长按弹出菜单/选择等默认行为，避免影响交互 ===== */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  /* 禁止浏览器接管手势（如长按/双击缩放等），保留我们自定义的 pointer 拖拽/十字线逻辑 */
+  touch-action: none;
 }
 
 .chart-container::-webkit-scrollbar {

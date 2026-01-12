@@ -11,6 +11,9 @@ export class InteractionController {
     private dragStartX = 0
     private scrollStartX = 0
 
+    // ===== 新增：触摸会话标记，避免触摸触发的模拟 mouse 事件干扰 =====
+    private isTouchSession = false
+
     // ===== Crosshair / Hover 状态（给渲染与 Vue tooltip 使用） =====
     crosshairPos: { x: number; y: number } | null = null
     crosshairIndex: number | null = null
@@ -23,17 +26,83 @@ export class InteractionController {
         this.chart = chart
     }
 
+    /**
+     * Pointer 事件：用于移动端/触屏设备。
+     * 设计目标：手指一接触屏幕（pointerdown）就立刻更新 crosshair。
+     */
+    onPointerDown(e: PointerEvent) {
+        // 只处理主指针（手指/鼠标主键），避免多指触控时状态混乱
+        if (e.isPrimary === false) return
+
+        // 标记触摸会话：触摸设备上 pointer 之后往往还会触发模拟的 mouse 事件
+        // 这里记录下来以便在 onMouseXxx 里忽略这些模拟事件
+        this.isTouchSession = e.pointerType === 'touch'
+
+        // 手指按下：立即更新十字线位置
+        this.isDragging = true
+        // 直接更新位置：避免先 clear 再 update 导致闪烁
+        this.updateHoverFromPoint(e.clientX, e.clientY)
+
+        const container = this.chart.getDom().container
+        this.dragStartX = e.clientX
+        this.scrollStartX = container.scrollLeft
+
+        this.chart.scheduleDraw()
+        // 不在这里 preventDefault：让容器仍然可以滚动（横向滚动由拖拽逻辑控制）
+    }
+
+    onPointerMove(e: PointerEvent) {
+        if (e.isPrimary === false) return
+        const container = this.chart.getDom().container
+
+        if (this.isDragging) {
+            const deltaX = this.dragStartX - e.clientX
+            container.scrollLeft = this.scrollStartX + deltaX
+            // 拖拽时也更新十字线（可选：让 crosshair 跟随手指）
+            this.updateHoverFromPoint(e.clientX, e.clientY)
+            this.chart.scheduleDraw()
+            return
+        }
+
+        this.updateHoverFromPoint(e.clientX, e.clientY)
+        this.chart.scheduleDraw()
+    }
+
+    onPointerUp(e: PointerEvent) {
+        if (e.isPrimary === false) return
+        this.isDragging = false
+
+        // 可选：如果希望抬起手指后十字线消失，可启用下面逻辑
+        // if (e.pointerType === 'touch') {
+        //     this.clearHover()
+        //     this.chart.scheduleDraw()
+        // }
+    }
+
+    onPointerLeave(e: PointerEvent) {
+        if (e.isPrimary === false) return
+        this.isDragging = false
+        this.isTouchSession = false
+        this.clearHover()
+        this.chart.scheduleDraw()
+    }
+
     onMouseDown(e: MouseEvent) {
+        // 触摸会话中忽略模拟的 mouse 事件
+        if (this.isTouchSession) return
         if (e.button !== 0) return
         const container = this.chart.getDom().container
         this.isDragging = true
-        this.clearHover()
+        // 鼠标按下时也更新 hover（保持与 pointer 行为一致）
         this.dragStartX = e.clientX
         this.scrollStartX = container.scrollLeft
+        this.updateHoverFromPoint(e.clientX, e.clientY)
+        this.chart.scheduleDraw()
         e.preventDefault()
     }
 
     onMouseMove(e: MouseEvent) {
+        if (this.isTouchSession) return
         const container = this.chart.getDom().container
         if (this.isDragging) {
             const deltaX = this.dragStartX - e.clientX
@@ -46,10 +115,12 @@ export class InteractionController {
     }
 
     onMouseUp() {
+        if (this.isTouchSession) return
         this.isDragging = false
     }
 
     onMouseLeave() {
+        if (this.isTouchSession) return
         this.isDragging = false
         this.clearHover()
         this.chart.scheduleDraw()
@@ -82,10 +153,14 @@ export class InteractionController {
     }
 
     private updateHover(e: MouseEvent) {
+        this.updateHoverFromPoint(e.clientX, e.clientY)
+    }
+
+    private updateHoverFromPoint(clientX: number, clientY: number) {
         const container = this.chart.getDom().container
         const rect = container.getBoundingClientRect()
-        const mouseX = e.clientX - rect.left
-        const mouseY = e.clientY - rect.top
+        const mouseX = clientX - rect.left
+        const mouseY = clientY - rect.top
 
         const opt = this.chart.getOption()
         const viewWidth = Math.max(1, Math.round(rect.width))
