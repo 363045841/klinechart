@@ -41,6 +41,7 @@
         </div>
       </div>
     </div>
+    <IndicatorSelector :active-indicators="activeIndicators" @toggle="handleIndicatorToggle" />
   </div>
 </template>
 
@@ -57,6 +58,7 @@ import {
 } from 'vue'
 import type { KLineData } from '@/types/price'
 import KLineTooltip from './KLineTooltip.vue'
+import IndicatorSelector from './IndicatorSelector.vue'
 import { Chart, type PaneSpec } from '@/core/chart'
 import { CandleRenderer } from '@/core/renderers/candle'
 import { GridLinesRenderer } from '@/core/renderers/gridLines'
@@ -216,6 +218,32 @@ function onWheel(e: WheelEvent) {
   syncHoverState()
 }
 
+// 指标选择器状态
+const activeIndicators = ref<string[]>(['MA'])
+
+// 指标切换处理
+function handleIndicatorToggle(indicatorId: string, active: boolean) {
+  if (active) {
+    if (!activeIndicators.value.includes(indicatorId)) {
+      activeIndicators.value.push(indicatorId)
+    }
+  } else {
+    activeIndicators.value = activeIndicators.value.filter((id) => id !== indicatorId)
+  }
+
+  // 更新 MA 显示配置
+  if (indicatorId === 'MA') {
+    const maConfig = {
+      ma5: active,
+      ma10: active,
+      ma20: active,
+    }
+    chartRef.value?.updateOptions({ showMA: maConfig })
+  }
+
+  scheduleRender()
+}
+
 /* 计算总宽度：绑图区域宽度 + 右侧轴宽度 */
 const totalWidth = computed(() => {
   const n = props.data?.length ?? 0
@@ -348,6 +376,7 @@ watch(
   justify-content: center;
   width: 100%;
   height: 100%;
+  flex-direction: column;
 }
 
 .chart-container {
