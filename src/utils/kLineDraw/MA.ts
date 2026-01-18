@@ -1,7 +1,7 @@
 import type { KLineData } from '@/types/price'
 import { priceToY } from '../priceToY'
 import type { drawOption, PriceRange } from './kLine'
-import { alignToPhysicalPixelCenter } from './pixelAlign'
+import { alignToPhysicalPixelCenter } from '@/core/draw/pixelAlign'
 
 export const MA5_COLOR = 'rgba(255, 193, 37, 1)'
 export const MA10_COLOR = 'rgba(190, 131, 12, 1)'

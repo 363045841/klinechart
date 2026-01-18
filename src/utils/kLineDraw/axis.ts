@@ -1,6 +1,6 @@
 import type { KLineData } from '@/types/price'
 import { priceToY, yToPrice } from '../priceToY'
-import { alignToPhysicalPixelCenter, roundToPhysicalPixel } from './pixelAlign'
+import { alignToPhysicalPixelCenter, roundToPhysicalPixel } from '@/core/draw/pixelAlign'
 import { formatYMDShanghai, formatMonthOrYear, monthKey } from '@/utils/dateFormat'
 
 export interface PriceAxisOptions {

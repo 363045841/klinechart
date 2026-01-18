@@ -1,4 +1,4 @@
-import { createHorizontalLineRect } from '@/utils/kLineDraw/pixelAlign'
+import { createHorizontalLineRect } from '@/core/draw/pixelAlign'
 
 export function drawPaneSeparators(args: {
     ctx: CanvasRenderingContext2D

@@ -218,8 +218,9 @@ export class InteractionController {
         }
 
         // ===== Tooltip 命中判定：仍要求命中 candle body/wick 才显示 tooltip =====
+        // 只在主图上显示 tooltip，副图不显示
         const k = typeof this.crosshairIndex === 'number' ? data[this.crosshairIndex] : undefined
-        if (!k || !pane) {
+        if (!k || !pane || pane.id !== 'main') {
             this.hoveredIndex = null
             return
         }

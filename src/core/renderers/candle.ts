@@ -1,13 +1,12 @@
 import type { PaneRenderer } from '@/core/layout/pane'
 import { getKLineTrend, type kLineTrend } from '@/types/kLine'
-import { alignRect, createVerticalLineRect } from '@/utils/kLineDraw/pixelAlign'
+import { alignRect, createVerticalLineRect } from '@/core/draw/pixelAlign'
 
 const UP_COLOR = 'rgba(214, 10, 34, 1)'
 const DOWN_COLOR = 'rgba(3, 123, 102, 1)'
 
 /**
  * 最小 Candle 渲染器：依赖 pane.yAxis 做 price->y。
- * 注意：这里暂时复用现有 pixelAlign 工具（后续可以一起迁到 core/draw）。
  */
 export const CandleRenderer: PaneRenderer = {
     draw({ ctx, pane, data, range, scrollLeft, kWidth, kGap, dpr }) {

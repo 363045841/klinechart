@@ -1,5 +1,5 @@
 import type { PaneRenderer } from '@/core/layout/pane'
-import { createHorizontalLineRect, createVerticalLineRect } from '@/utils/kLineDraw/pixelAlign'
+import { createHorizontalLineRect, createVerticalLineRect } from '@/core/draw/pixelAlign'
 
 /**
  * 仅绘制网格线（不绘制任何文字刻度）。

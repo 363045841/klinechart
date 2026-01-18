@@ -1,4 +1,4 @@
-import { alignToPhysicalPixelCenter } from '@/utils/kLineDraw/pixelAlign'
+import { alignToPhysicalPixelCenter } from '@/core/draw/pixelAlign'
 
 export function drawPaneBorders(args: {
     ctx: CanvasRenderingContext2D

@@ -60,7 +60,7 @@ export function drawGridLayer(
 
     const unit = option.kWidth + option.kGap
     const gridColor = gridOpt.gridColor ?? 'rgba(0,0,0,0.08)'
-    const lastPriceColor = gridOpt.lastPriceColor ?? 'rgba(0,0,0,0.25)'
+    const lastPriceColor = gridOpt.lastPriceColor ?? 'rgb(183, 22, 22)'
     const textColor = gridOpt.textColor ?? 'rgba(0,0,0,0.55)'
     const fontSize = gridOpt.fontSize ?? 12
     const rightTextPadding = gridOpt.rightTextPadding ?? 6

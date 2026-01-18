@@ -1,5 +1,5 @@
 import type { PaneRenderer } from '@/core/layout/pane'
-import { roundToPhysicalPixel, createHorizontalLineRect } from '@/utils/kLineDraw/pixelAlign'
+import { roundToPhysicalPixel, createHorizontalLineRect } from '@/core/draw/pixelAlign'
 
 /**
  * 可视区最高/最低价标注（仅绘制标注，不绘制蜡烛）。
@@ -77,4 +77,3 @@ function drawPriceMarker(ctx: CanvasRenderingContext2D, x: number, y: number, pr
     ctx.fillStyle = 'rgba(0,0,0,0.70)'
     ctx.fillText(text, roundToPhysicalPixel(x + lineLength + padding, dpr), roundToPhysicalPixel(y, dpr))
 }
-

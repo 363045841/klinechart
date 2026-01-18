@@ -6,13 +6,27 @@ import { PaneRenderer } from '@/core/paneRenderer'
 import { drawTimeAxisLayer } from '@/core/renderers/timeAxis'
 import { drawCrosshair } from '@/core/renderers/crosshair'
 import { drawMALegend } from '@/core/renderers/maLegend'
+import { drawAllPanesBorders } from '@/core/renderers/globalBorders'
 
+/**
+ * 图表 DOM 元素引用
+ * @property container - 图表容器 div
+ * @property canvasLayer - Canvas 层容器 div（包含所有绘制 canvas）
+ * @property xAxisCanvas - X 轴时间轴 canvas
+ * @property borderCanvas - 全局边框 canvas（可选，由 Chart 内部创建）
+ */
 export type ChartDom = {
     container: HTMLDivElement
     canvasLayer: HTMLDivElement
     xAxisCanvas: HTMLCanvasElement
+    borderCanvas?: HTMLCanvasElement
 }
 
+/**
+ * Pane 面板配置
+ * @param id - Pane 标识符
+ * @param ratio - Pane 高度占比
+ */
 export type PaneSpec = { id: string; ratio: number }
 
 export type PaneRendererDom = {
@@ -54,6 +68,21 @@ export class Chart {
     private paneRenderers: PaneRenderer[] = []
     readonly interaction: InteractionController
 
+    /**
+     * 创建图表实例。
+     *
+     * @param dom 由 Vue 组件传入的 DOM 句柄（container/canvasLayer/三层 canvas）
+     * @param opt 初始配置（kWidth/kGap、轴尺寸、pane 配置等）
+     */
+    constructor(dom: ChartDom, opt: ChartOptions) {
+        this.dom = dom
+        this.opt = opt
+        this.interaction = new InteractionController(this)
+
+        this.initPanes()
+    }
+
+
     // 缩放回调：用于通知外部（Vue）同步 kWidth/kGap 与 scrollLeft
     private onZoomChange?: (kWidth: number, kGap: number, targetScrollLeft: number) => void
 
@@ -71,19 +100,6 @@ export class Chart {
         this.onZoomChange = cb
     }
 
-    /**
-     * 创建图表实例。
-     *
-     * @param dom 由 Vue 组件传入的 DOM 句柄（container/canvasLayer/三层 canvas）
-     * @param opt 初始配置（kWidth/kGap、轴尺寸、pane 配置等）
-     */
-    constructor(dom: ChartDom, opt: ChartOptions) {
-        this.dom = dom
-        this.opt = opt
-        this.interaction = new InteractionController(this)
-
-        this.initPanes()
-    }
 
     /** 获取所有 PaneRenderer */
     getPaneRenderers(): PaneRenderer[] {
@@ -197,7 +213,7 @@ export class Chart {
         xAxisCtx.scale(vp.dpr, vp.dpr)
         xAxisCtx.clearRect(0, 0, vp.plotWidth, this.opt.bottomAxisHeight)
 
-        // 4. 计算可视数据范围
+        // 4. 计算可视K线数据范围
         const { start, end } = getVisibleRange(
             vp.scrollLeft,
             vp.plotWidth,
@@ -240,7 +256,7 @@ export class Chart {
         })
 
         // 8. 绘制十字线
-        // 垂直线在所有 pane 上绘制，水平线只在活跃的 pane 上绘制（但在主图底部padding和副图顶部padding区域不绘制）
+        // 垂直线在所有 pane 上绘制，水平线只在活跃的 pane 上绘制
         if (this.interaction.crosshairPos) {
             const { x, y } = this.interaction.crosshairPos
             const activePaneId = this.interaction.activePaneId
@@ -253,19 +269,6 @@ export class Chart {
                 const isActive = pane.id === activePaneId
                 const localY = isActive ? y - pane.top : 0 // 活跃 pane 使用相对 y 坐标
 
-                // 计算水平线的绘制限制（不在主图底部padding和副图顶部padding区域绘制）
-                const yPaddingPx = this.opt.yPaddingPx
-                let horizontalYMin = 0
-                let horizontalYMax = pane.height
-
-                if (pane.id === 'main') {
-                    // 主图：不绘制在底部padding区域
-                    horizontalYMax = pane.height - yPaddingPx
-                } else if (pane.id === 'sub') {
-                    // 副图：不绘制在顶部padding区域
-                    horizontalYMin = yPaddingPx
-                }
-
                 plotCtx.save()
                 drawCrosshair({
                     ctx: plotCtx,
@@ -276,8 +279,6 @@ export class Chart {
                     y: localY,
                     drawVertical: true,
                     drawHorizontal: isActive,
-                    horizontalYMin,
-                    horizontalYMax,
                 })
                 plotCtx.restore()
             }
@@ -288,6 +289,7 @@ export class Chart {
         if (mainRenderer) {
             const plotCtx = mainRenderer.getDom().plotCanvas.getContext('2d')
             if (plotCtx) {
+                // plotCtx.clearRect(0, 0, vp.plotWidth, vp.plotHeight)
                 drawMALegend({
                     ctx: plotCtx,
                     data: this.data,
@@ -298,6 +300,26 @@ export class Chart {
                 })
             }
         }
+
+        // 10. 绘制全局边框
+        const borderCanvas = this.dom.borderCanvas
+        if (!borderCanvas) return
+        const borderCtx = borderCanvas.getContext('2d')
+        if (!borderCtx) return
+
+        borderCtx.setTransform(1, 0, 0, 1, 0, 0)
+        borderCtx.scale(vp.dpr, vp.dpr)
+        borderCtx.clearRect(0, 0, vp.plotWidth, vp.plotHeight)
+
+        drawAllPanesBorders({
+            ctx: borderCtx,
+            dpr: vp.dpr,
+            plotWidth: vp.plotWidth,
+            panes: this.paneRenderers.map(r => ({
+                top: r.getPane().top,
+                height: r.getPane().height
+            }))
+        })
     }
 
     /**
@@ -399,6 +421,15 @@ export class Chart {
                 canvasLayer.appendChild(dom.plotCanvas)
                 canvasLayer.appendChild(dom.yAxisCanvas)
             })
+
+            // 创建边框 canvas（全局，覆盖所有 pane）
+            const borderCanvas = document.createElement('canvas')
+            borderCanvas.style.position = 'absolute'
+            borderCanvas.style.left = '0'
+            borderCanvas.style.top = '0'
+            borderCanvas.style.pointerEvents = 'none' // 不阻挡交互
+            this.dom.borderCanvas = borderCanvas
+            canvasLayer.appendChild(borderCanvas)
         }
     }
 
@@ -474,6 +505,14 @@ export class Chart {
         this.dom.xAxisCanvas.style.top = `${plotHeight}px`
         this.dom.xAxisCanvas.width = Math.round(plotWidth * dpr)
         this.dom.xAxisCanvas.height = Math.round(this.opt.bottomAxisHeight * dpr)
+
+        // 设置边框 canvas 尺寸（如果存在）
+        if (this.dom.borderCanvas) {
+            this.dom.borderCanvas.style.width = `${plotWidth}px`
+            this.dom.borderCanvas.style.height = `${plotHeight}px`
+            this.dom.borderCanvas.width = Math.round(plotWidth * dpr)
+            this.dom.borderCanvas.height = Math.round(plotHeight * dpr)
+        }
 
         const vp: Viewport = {
             viewWidth,

@@ -14,7 +14,6 @@
       @pointermove="onPointerMove"
       @pointerup="onPointerUp"
       @pointerleave="onPointerLeave"
-      @wheel.prevent="onWheel"
     >
       <!-- scroll-content 负责撑开横向滚动宽度，并承载 sticky 的画布层 -->
       <div class="scroll-content" :style="{ width: totalWidth + 'px' }">
@@ -42,16 +41,7 @@
 </template>
 
 <script setup lang="ts">
-import {
-  ref,
-  computed,
-  onMounted,
-  onUnmounted,
-  watch,
-  nextTick,
-  shallowRef,
-  watchEffect,
-} from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick, shallowRef } from 'vue'
 import type { KLineData } from '@/types/price'
 import KLineTooltip from './KLineTooltip.vue'
 import IndicatorSelector from './IndicatorSelector.vue'
@@ -207,11 +197,6 @@ function onScroll() {
   syncHoverState()
 }
 
-function onWheel(e: WheelEvent) {
-  chartRef.value?.interaction.onWheel(e)
-  syncHoverState()
-}
-
 // 指标选择器状态
 const activeIndicators = ref<string[]>(['MA'])
 
@@ -232,7 +217,13 @@ function handleIndicatorToggle(indicatorId: string, active: boolean) {
       ma10: active,
       ma20: active,
     }
-    chartRef.value?.updateOptions({ showMA: maConfig })
+    chartRef.value?.setPaneRenderers('main', [
+      GridLinesRenderer,
+      LastPriceLineRenderer,
+      CandleRenderer,
+      ExtremaMarkersRenderer,
+      createMARenderer(maConfig),
+    ])
   }
 
   scheduleRender()
@@ -261,6 +252,13 @@ onMounted(() => {
   const canvasLayer = canvasLayerRef.value
   const xAxisCanvas = xAxisCanvasRef.value
   if (!container || !canvasLayer || !xAxisCanvas) return
+
+  // 手动添加 wheel 事件监听器，设置 passive: false 以允许 preventDefault()
+  const onWheelHandler = (e: WheelEvent) => {
+    chartRef.value?.interaction.onWheel(e)
+    syncHoverState()
+  }
+  container.addEventListener('wheel', onWheelHandler, { passive: false })
 
   const panes: PaneSpec[] = [
     { id: 'main', ratio: props.paneRatios[0] },
@@ -301,7 +299,7 @@ onMounted(() => {
     scheduleRender()
   })
 
-  // 主/副 pane：先恢复网格 + 最新价虚线 + 蜡烛图（副图后续替换为 MACD renderer）
+  // 主/副 pane
   chart.setPaneRenderers('main', [
     GridLinesRenderer,
     LastPriceLineRenderer,
@@ -321,6 +319,7 @@ onMounted(() => {
 
   // 绑定到实例上，unmount 时移除（通过闭包变量）
   ;(chart as any).__onResize = onResize
+  ;(chart as any).__onWheel = onWheelHandler
 })
 
 onUnmounted(() => {
@@ -328,6 +327,11 @@ onUnmounted(() => {
   if (chart) {
     const onResize = (chart as any).__onResize as ((this: Window, ev: UIEvent) => any) | undefined
     if (onResize) window.removeEventListener('resize', onResize)
+    const onWheel = (chart as any).__onWheel as
+      | ((this: HTMLElement, ev: WheelEvent) => any)
+      | undefined
+    const container = containerRef.value
+    if (onWheel && container) container.removeEventListener('wheel', onWheel)
     chart.destroy()
   }
   chartRef.value = null
