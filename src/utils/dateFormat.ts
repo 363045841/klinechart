@@ -108,3 +108,32 @@ export const formatShanghaiDate = formatDateToYYYYMMDD
  * @returns 格式化后的日期字符串，例如 "2025-01-14"
  */
 export const formatYMDShanghai = formatDateToYYYYMMDD
+
+/**
+ * 查找每个月份第一个K线的索引
+ * @param data - K线数据数组（按时间升序排列）
+ * @returns 月边界索引数组，例如 [0, 30, 60] 表示第0、30、60个K线分别是每月的第一个交易日
+ * 
+ * @example
+ * // 假设数据：[1/2, 1/3, 2/1, 2/2, 3/1, 3/2]
+ * findMonthBoundaries(data) // [0, 2, 4]
+ * // 解释：第0个K线是1月第一个，第2个K线是2月第一个，第4个K线是3月第一个
+ */
+export function findMonthBoundaries(data: Array<{ timestamp: number } | undefined>): number[] {
+    if (data.length === 0) return []
+
+    const boundaries: number[] = [0] // 第一个数据点总是某月的第一个
+    let lastMonthKey = monthKey(data[0]!.timestamp)
+
+    for (let i = 1; i < data.length; i++) {
+        const cur = data[i]
+        if (!cur) continue
+        const curKey = monthKey(cur.timestamp)
+        if (curKey !== lastMonthKey) {
+            boundaries.push(i)
+            lastMonthKey = curKey
+        }
+    }
+
+    return boundaries
+}

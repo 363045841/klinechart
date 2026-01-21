@@ -1,7 +1,7 @@
 import type { KLineData } from '@/types/price'
 import { priceToY, yToPrice } from '../priceToY'
 import { alignToPhysicalPixelCenter, roundToPhysicalPixel } from '@/core/draw/pixelAlign'
-import { formatYMDShanghai, formatMonthOrYear, monthKey } from '@/utils/dateFormat'
+import { formatYMDShanghai, formatMonthOrYear, monthKey, findMonthBoundaries } from '@/utils/dateFormat'
 
 export interface PriceAxisOptions {
     x: number
@@ -393,34 +393,38 @@ export function drawTimeAxis(ctx: CanvasRenderingContext2D, opts: TimeAxisOption
     ctx.textBaseline = 'middle'
     const textY = y + height / 2
 
-    for (let i = Math.max(startIndex, 1); i < endIndex && i < data.length; i++) {
-        const cur = data[i]
-        const prev = data[i - 1]
-        if (!cur || !prev) continue
+    // 使用预计算的月边界
+    const boundaries = findMonthBoundaries(data)
 
-        if (monthKey(cur.timestamp) !== monthKey(prev.timestamp)) {
-            const worldX = kGap + i * unit
-            const screenX = worldX - scrollLeft
+    // 只考虑可视范围内的边界
+    const visibleBoundaries = boundaries.filter((idx: number) => idx >= startIndex && idx < endIndex)
 
-            // 避免文字/刻度贴边：按左右 padding 收紧可绘制区域
-            const minX = paddingX
-            const maxX = Math.max(paddingX, width - paddingX)
+    for (const idx of visibleBoundaries) {
+        const k = data[idx]
+        if (!k) continue
 
-            if (screenX >= minX && screenX <= maxX) {
-                const drawX = Math.min(Math.max(screenX, minX), maxX)
-                // 刻度短线
-                ctx.strokeStyle = lineColor
-                ctx.beginPath()
-                const lx = alignToPhysicalPixelCenter(drawX, dpr)
-                ctx.moveTo(lx, y)
-                ctx.lineTo(lx, y + 4)
-                ctx.stroke()
+        // 关键修改：加 kWidth/2 使刻度对齐到K线实体中部
+        const worldX = kGap + idx * unit + kWidth / 2
+        const screenX = worldX - scrollLeft
 
-                const { text, isYear } = formatMonthOrYear(cur.timestamp)
-                ctx.fillStyle = textColor
-                ctx.font = `${isYear ? 'bold ' : ''}${fontSize}px -apple-system,BlinkMacSystemFont,Trebuchet MS,Roboto,Ubuntu,sans-serif`
-                ctx.fillText(text, roundToPhysicalPixel(drawX, dpr), roundToPhysicalPixel(textY, dpr))
-            }
+        // 避免文字/刻度贴边：按左右 padding 收紧可绘制区域
+        const minX = paddingX
+        const maxX = Math.max(paddingX, width - paddingX)
+
+        if (screenX >= minX && screenX <= maxX) {
+            const drawX = Math.min(Math.max(screenX, minX), maxX)
+            // 刻度短线
+            ctx.strokeStyle = lineColor
+            ctx.beginPath()
+            const lx = alignToPhysicalPixelCenter(drawX, dpr)
+            ctx.moveTo(lx, y)
+            ctx.lineTo(lx, y + 4)
+            ctx.stroke()
+
+            const { text, isYear } = formatMonthOrYear(k.timestamp)
+            ctx.fillStyle = textColor
+            ctx.font = `${isYear ? 'bold ' : ''}${fontSize}px -apple-system,BlinkMacSystemFont,Trebuchet MS,Roboto,Ubuntu,sans-serif`
+            ctx.fillText(text, roundToPhysicalPixel(drawX, dpr), roundToPhysicalPixel(textY, dpr))
         }
     }
 }

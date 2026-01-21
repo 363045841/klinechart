@@ -492,8 +492,8 @@ export class Chart {
         if (!container) return null
 
         const rect = container.getBoundingClientRect()
-        const viewWidth = Math.max(1, Math.round(rect.width))
-        const viewHeight = Math.max(1, Math.round(rect.height))
+        const viewWidth = Math.max(1, rect.width)
+        const viewHeight = Math.max(1, rect.height)
         const scrollLeft = container.scrollLeft
 
         const yAxisTotalWidth = this.opt.rightAxisWidth + (this.opt.priceLabelWidth || 60)
@@ -520,8 +520,8 @@ export class Chart {
         if (this.dom.borderCanvas) {
             this.dom.borderCanvas.style.width = `${plotWidth}px`
             this.dom.borderCanvas.style.height = `${plotHeight}px`
-            this.dom.borderCanvas.width = Math.round(plotWidth * dpr)
-            this.dom.borderCanvas.height = Math.round(plotHeight * dpr)
+            this.dom.borderCanvas.width = Math.ceil(plotWidth * dpr)
+            this.dom.borderCanvas.height = Math.ceil(plotHeight * dpr)
         }
 
         const vp: Viewport = {
