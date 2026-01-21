@@ -393,6 +393,10 @@ export class Chart {
             const plotCanvas = document.createElement('canvas')
             const yAxisCanvas = document.createElement('canvas')
 
+            // 设置 canvas id
+            plotCanvas.id = `${spec.id}-plot`
+            yAxisCanvas.id = `${spec.id}-yAxis`
+
             // 设置初始样式
             plotCanvas.style.position = 'absolute'
             plotCanvas.style.left = '0'
@@ -400,7 +404,7 @@ export class Chart {
 
             yAxisCanvas.style.position = 'absolute'
             yAxisCanvas.style.top = '0'
-            yAxisCanvas.style.right = '0'
+            yAxisCanvas.style.left = '0'  // 将使用 left 定位，跟随 pane 右侧
 
             // 创建 PaneRenderer
             const renderer = new PaneRenderer(
@@ -433,6 +437,7 @@ export class Chart {
 
             // 创建边框 canvas（全局，覆盖所有 pane）
             const borderCanvas = document.createElement('canvas')
+            borderCanvas.id = 'border'
             borderCanvas.style.position = 'absolute'
             borderCanvas.style.left = '0'
             borderCanvas.style.top = '0'
@@ -471,10 +476,12 @@ export class Chart {
 
             // 调整 PaneRenderer 的 canvas 尺寸和位置
             renderer.resize(vp.plotWidth, h, vp.dpr)
-            // 设置 canvas 的 top 位置
+            // 设置 canvas 的 top 和 left 位置
             const dom = renderer.getDom()
             dom.plotCanvas.style.top = `${y}px`
             dom.yAxisCanvas.style.top = `${y}px`
+            // yAxisCanvas 的 left 使用向下取整，确保贴边
+            dom.yAxisCanvas.style.left = `${Math.floor(vp.plotWidth)}px`
 
             y += h + gap
         }
@@ -492,13 +499,14 @@ export class Chart {
         if (!container) return null
 
         const rect = container.getBoundingClientRect()
-        const viewWidth = Math.max(1, rect.width)
-        const viewHeight = Math.max(1, rect.height)
+        const viewWidth = Math.max(1, Math.ceil(rect.width))
+        const viewHeight = Math.max(1, Math.ceil(rect.height))
         const scrollLeft = container.scrollLeft
 
         const yAxisTotalWidth = this.opt.rightAxisWidth + (this.opt.priceLabelWidth || 60)
-        const plotWidth = viewWidth - yAxisTotalWidth
-        const plotHeight = viewHeight - this.opt.bottomAxisHeight
+        // plotWidth 和 plotHeight 统一向上取整，确保为整数
+        const plotWidth = Math.round(viewWidth - yAxisTotalWidth)
+        const plotHeight = Math.round(viewHeight - this.opt.bottomAxisHeight)
 
         let dpr = window.devicePixelRatio || 1
         const MAX_CANVAS_PIXELS = 16 * 1024 * 1024
@@ -512,7 +520,8 @@ export class Chart {
 
         this.dom.xAxisCanvas.style.width = `${plotWidth}px`
         this.dom.xAxisCanvas.style.height = `${this.opt.bottomAxisHeight}px`
-        this.dom.xAxisCanvas.style.top = `${plotHeight}px`
+        // xAxisCanvas 的 top 使用向下取整，确保贴边
+        this.dom.xAxisCanvas.style.top = `${Math.floor(plotHeight)}px`
         this.dom.xAxisCanvas.width = Math.round(plotWidth * dpr)
         this.dom.xAxisCanvas.height = Math.round(this.opt.bottomAxisHeight * dpr)
 

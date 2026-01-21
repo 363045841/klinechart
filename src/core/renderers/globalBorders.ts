@@ -1,4 +1,5 @@
 import { alignToPhysicalPixelCenter, roundToPhysicalPixel } from '@/core/draw/pixelAlign'
+import { BORDER_COLORS } from '@/core/theme/colors'
 
 export function drawAllPanesBorders(args: {
     ctx: CanvasRenderingContext2D
@@ -7,15 +8,17 @@ export function drawAllPanesBorders(args: {
     panes: Array<{ top: number; height: number }>
     color?: string
 }) {
-    const { ctx, dpr, plotWidth, panes, color = 'rgba(0,0,0,0.12)' } = args
+    const { ctx, dpr, plotWidth, panes, color = BORDER_COLORS.DARK } = args
     if (panes.length === 0) return
 
     ctx.save()
     ctx.strokeStyle = color
     ctx.lineWidth = 3
 
-    const x1 = alignToPhysicalPixelCenter(0, dpr)
-    const x2 = alignToPhysicalPixelCenter(plotWidth, dpr)
+    // 添加内边距，避免 3px 宽的线条被边缘裁剪
+    const margin = 1.5 / dpr  // 线宽的一半
+    const x1 = alignToPhysicalPixelCenter(margin, dpr)
+    const x2 = alignToPhysicalPixelCenter(plotWidth - margin, dpr)
 
     // 计算整体边界
     let outerTop = Infinity
@@ -27,11 +30,14 @@ export function drawAllPanesBorders(args: {
     outerTop = Number.isFinite(outerTop) ? outerTop : 0
     outerBottom = Number.isFinite(outerBottom) ? outerBottom : 0
 
+    // 输出框线绘制的宽度和高度
+    console.log('框线绘制范围:', { width: plotWidth, height: outerBottom - outerTop })
+
     ctx.beginPath()
 
-    // 绘制顶部边框（仅第一个 pane）
+    // 绘制顶部边框（仅第一个 pane），向内偏移避免裁剪
     const firstPane = panes[0]!
-    const y1 = alignToPhysicalPixelCenter(firstPane.top, dpr)
+    const y1 = alignToPhysicalPixelCenter(firstPane.top + margin, dpr)
     ctx.moveTo(x1, y1)
     ctx.lineTo(x2, y1)
 
@@ -42,10 +48,10 @@ export function drawAllPanesBorders(args: {
     ctx.moveTo(x1, y2)
     ctx.lineTo(x2, y2)
 
-    // 绘制左侧边框（从整体顶部到底部）
-    const yTop = alignToPhysicalPixelCenter(outerTop, dpr)
+    // 绘制左侧边框（从整体顶部到底部），向内偏移避免裁剪
+    const yTop = alignToPhysicalPixelCenter(outerTop + margin, dpr)
     // 左右侧边框也使用 roundToPhysicalPixel 确保在 canvas 内部
-    const yBottom = roundToPhysicalPixel(outerBottom - 0.5, dpr)
+    const yBottom = roundToPhysicalPixel(outerBottom - margin, dpr)
     ctx.moveTo(x1, yTop)
     ctx.lineTo(x1, yBottom)
 
