@@ -29,8 +29,10 @@ export function drawPaneBorders(args: {
     ctx.strokeStyle = color
     ctx.lineWidth = 20
 
-    const x1 = alignToPhysicalPixelCenter(0, dpr)
-    const x2 = alignToPhysicalPixelCenter(width, dpr)
+    // 添加内边距避免 20px 宽的线条被边缘裁剪
+    const margin = 10 / dpr  // 线宽的一半
+    const x1 = alignToPhysicalPixelCenter(margin, dpr)
+    const x2 = alignToPhysicalPixelCenter(width - margin, dpr)
 
     // 计算外边界（用于选择性忽略）
     let outerTop = Infinity

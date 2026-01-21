@@ -41,10 +41,9 @@ export function drawAllPanesBorders(args: {
     ctx.moveTo(x1, y1)
     ctx.lineTo(x2, y1)
 
-    // 绘制底部边框（仅最后一个 pane，在时间轴上方）
+    // 绘制底部边框（仅最后一个 pane，在时间轴上方），向内偏移避免裁剪
     const lastPane = panes[panes.length - 1]!
-    // 使用 roundToPhysicalPixel 确保线条在 canvas 内部
-    const y2 = roundToPhysicalPixel(lastPane.top + lastPane.height - 0.5, dpr)
+    const y2 = alignToPhysicalPixelCenter(lastPane.top + lastPane.height - margin, dpr)
     ctx.moveTo(x1, y2)
     ctx.lineTo(x2, y2)
 
