@@ -1,7 +1,7 @@
 import type { MAFlags } from '@/core/renderers/ma'
 import type { KLineData } from '@/types/price'
 import { calcMAAtIndex } from '@/utils/kline/ma'
-import { MA_COLORS, TEXT_COLORS } from '@/core/theme/colors'
+import { MA_COLORS, TEXT_COLORS, PRICE_COLORS } from '@/core/theme/colors'
 
 export function drawMALegend(args: {
     ctx: CanvasRenderingContext2D
@@ -37,7 +37,7 @@ export function drawMALegend(args: {
         let x = legendX
         const y = legendY
 
-        ctx.fillStyle = TEXT_COLORS.NEUTRAL
+        ctx.fillStyle = PRICE_COLORS.NEUTRAL
         ctx.fillText('均线', x, y)
         x += ctx.measureText('均线').width + gap
 

@@ -53,7 +53,11 @@ describe('物理像素控制缩放', () => {
         // 计算逻辑像素间隔
         const gaps: number[] = []
         for (let i = 1; i < sequence.length; i++) {
-            gaps.push(sequence[i].kWidth - sequence[i - 1].kWidth)
+            const current = sequence[i]
+            const prev = sequence[i - 1]
+            if (current && prev) {
+                gaps.push(current.kWidth - prev.kWidth)
+            }
         }
         
         console.log(`\n逻辑像素间隔: ${gaps.map(g => g.toFixed(2)).join(', ')}`)
@@ -108,7 +112,11 @@ describe('物理像素控制缩放', () => {
         // 计算逻辑像素间隔
         const gaps: number[] = []
         for (let i = 1; i < sequence.length; i++) {
-            gaps.push(sequence[i].kWidth - sequence[i - 1].kWidth)
+            const current = sequence[i]
+            const prev = sequence[i - 1]
+            if (current && prev) {
+                gaps.push(current.kWidth - prev.kWidth)
+            }
         }
         
         console.log(`\n逻辑像素间隔: ${gaps.map(g => g.toFixed(2)).join(', ')}`)
@@ -151,12 +159,20 @@ describe('物理像素控制缩放', () => {
         // 计算间隔对比
         const physGaps: number[] = []
         for (let i = 1; i < physSequence.length; i++) {
-            physGaps.push(physSequence[i] - physSequence[i - 1])
+            const current = physSequence[i]
+            const prev = physSequence[i - 1]
+            if (current !== undefined && prev !== undefined) {
+                physGaps.push(current - prev)
+            }
         }
         
         const logicGaps: number[] = []
         for (let i = 1; i < logicSequence.length; i++) {
-            logicGaps.push(logicSequence[i] - logicSequence[i - 1])
+            const current = logicSequence[i]
+            const prev = logicSequence[i - 1]
+            if (current !== undefined && prev !== undefined) {
+                logicGaps.push(current - prev)
+            }
         }
         
         console.log(`\n间隔对比:`)
@@ -187,7 +203,11 @@ describe('物理像素控制缩放', () => {
             // 计算间隔
             const gaps: number[] = []
             for (let i = 1; i < sequence.length; i++) {
-                gaps.push(sequence[i] - sequence[i - 1])
+                const current = sequence[i]
+                const prev = sequence[i - 1]
+                if (current !== undefined && prev !== undefined) {
+                    gaps.push(current - prev)
+                }
             }
             
             console.log(`DPR=${dpr}:`)

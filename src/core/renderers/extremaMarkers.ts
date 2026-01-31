@@ -1,6 +1,6 @@
 import type { PaneRenderer } from '@/core/layout/pane'
 import { roundToPhysicalPixel, createHorizontalLineRect } from '@/core/draw/pixelAlign'
-import { TEXT_COLORS } from '@/core/theme/colors'
+import { TEXT_COLORS, PRICE_COLORS } from '@/core/theme/colors'
 
 /**
  * 可视区最高/最低价标注（仅绘制标注，不绘制蜡烛）。
@@ -90,7 +90,7 @@ function drawPriceMarker(ctx: CanvasRenderingContext2D, x: number, y: number, pr
     // 文本
     ctx.font = '12px Arial'
     ctx.textBaseline = 'middle'
-    ctx.fillStyle = TEXT_COLORS.NEUTRAL
+    ctx.fillStyle = PRICE_COLORS.NEUTRAL
 
     if (drawLeft) {
         // 向左绘制
