@@ -1,6 +1,18 @@
 import { alignToPhysicalPixelCenter } from '@/core/draw/pixelAlign'
 import { BORDER_COLORS } from '@/core/theme/colors'
 
+/**
+ * 绘制 pane 边框
+ * @param ctx Canvas 绘图上下文
+ * @param dpr 设备像素比
+ * @param width 绘图区宽度
+ * @param panes pane 数组，每个包含 top 和 height 属性
+ * @param color 边框颜色
+ * @param omitOuterTop 是否忽略上边界
+ * @param omitOuterRight 是否忽略右边界
+ * @param omitOuterBottom 是否忽略下边界
+ * @param omitOuterLeft 是否忽略左边界
+ */
 export function drawPaneBorders(args: {
     ctx: CanvasRenderingContext2D
     dpr: number
@@ -29,12 +41,9 @@ export function drawPaneBorders(args: {
     ctx.strokeStyle = color
     ctx.lineWidth = 20
 
-    // 添加内边距避免 20px 宽的线条被边缘裁剪
-    const margin = 10 / dpr  // 线宽的一半
+    const margin = 10 / dpr
     const x1 = alignToPhysicalPixelCenter(margin, dpr)
     const x2 = alignToPhysicalPixelCenter(width - margin, dpr)
-
-    // 计算外边界（用于选择性忽略）
     let outerTop = Infinity
     let outerBottom = -Infinity
     for (const p of panes) {
@@ -52,22 +61,18 @@ export function drawPaneBorders(args: {
         const isOuterBottom = Math.abs(p.top + p.height - outerBottom) < 1e-6
 
         ctx.beginPath()
-        // 上
         if (!(omitOuterTop && isOuterTop)) {
             ctx.moveTo(x1, y1)
             ctx.lineTo(x2, y1)
         }
-        // 右
         if (!omitOuterRight) {
             ctx.moveTo(x2, y1)
             ctx.lineTo(x2, y2)
         }
-        // 下
         if (!(omitOuterBottom && isOuterBottom)) {
             ctx.moveTo(x1, y2)
             ctx.lineTo(x2, y2)
         }
-        // 左
         if (!omitOuterLeft) {
             ctx.moveTo(x1, y1)
             ctx.lineTo(x1, y2)

@@ -1,5 +1,13 @@
 import { TEXT_COLORS } from '@/core/theme/colors'
 
+/**
+ * Ø6 pane ˜
+ * @param ctx Canvas Øþ
+‡
+ * @param dpr ¾Ï Ô
+ * @param paneTop pane vèMn
+ * @param title ˜‡,
+ */
 export function drawPaneTitle(args: {
     ctx: CanvasRenderingContext2D
     dpr: number

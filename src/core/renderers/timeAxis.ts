@@ -1,6 +1,18 @@
 import type { KLineData } from '@/types/price'
 import { drawTimeAxis, drawCrosshairTimeLabel } from '@/utils/kLineDraw/axis'
 
+/**
+ * 绘制时间轴层
+ * @param ctx Canvas 绘图上下文
+ * @param data K 线数据
+ * @param scrollLeft 滚动偏移量
+ * @param kWidth K 线宽度
+ * @param kGap K 线间隔
+ * @param startIndex 起始索引
+ * @param endIndex 结束索引
+ * @param dpr 设备像素比
+ * @param crosshair 十字线信息，包含横坐标和索引
+ */
 export function drawTimeAxisLayer(args: {
     ctx: CanvasRenderingContext2D
     data: KLineData[]
@@ -32,8 +44,8 @@ export function drawTimeAxisLayer(args: {
         startIndex,
         endIndex,
         dpr,
-        drawTopBorder: false, // 不绘制顶部边框，避免与主图底边框重叠
-        drawBottomBorder: false, // 不绘制底部边框，避免与副图下边框重叠
+        drawTopBorder: false,
+        drawBottomBorder: false,
     })
 
     if (crosshair && typeof crosshair.index === 'number') {

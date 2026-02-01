@@ -10,8 +10,10 @@ export type MAFlags = {
 }
 
 /**
- * MA 渲染：复用现有 drawMA*Line（world 坐标绘制：需 translate(-scrollLeft,0)）。
- * 注意：drawMA*Line 内部使用 priceToY + priceRange，因此可直接用 pane.priceRange。
+ * 创建 MA 渲染器，复用 drawMA*Line（world 坐标绘制：需 translate(-scrollLeft,0)）
+ * drawMA*Line 内部使用 priceToY + priceRange，因此可直接用 pane.priceRange
+ * @param showMA 显示哪些均线的标志
+ * @returns PaneRenderer 实例
  */
 export function createMARenderer(showMA: MAFlags): PaneRenderer {
     return {

@@ -3,16 +3,13 @@ import { roundToPhysicalPixel, createHorizontalLineRect } from '@/core/draw/pixe
 import { TEXT_COLORS, PRICE_COLORS } from '@/core/theme/colors'
 
 /**
- * 可视区最高/最低价标注（仅绘制标注，不绘制蜡烛）。
- * 说明：
- * - 使用 pane.yAxis.priceToY 作为 Y 映射（与当前 pane 的 priceRange 一致）
- * - world 坐标绘制（会 translate(-scrollLeft, 0)）
+ * 可视区最高/最低价标注渲染器（仅绘制标注，不绘制蜡烛）
+ * 使用 pane.yAxis.priceToY 作为 Y 映射（与当前 pane 的 priceRange 一致），world 坐标绘制（会 translate(-scrollLeft, 0)）
  */
 export const ExtremaMarkersRenderer: PaneRenderer = {
     draw({ ctx, pane, data, range, scrollLeft, kWidth, kGap, dpr, paneWidth }) {
         if (!data.length) return
 
-        // 副图占位时不画极值标注（避免空白区域出现无意义标注）
         if (pane.id !== 'main') return
 
         const start = Math.max(0, range.start)
@@ -50,24 +47,29 @@ export const ExtremaMarkersRenderer: PaneRenderer = {
     },
 }
 
+/**
+ * 绘制价格标记
+ * @param ctx Canvas 绘图上下文
+ * @param x world 坐标横坐标
+ * @param y world 坐标纵坐标
+ * @param price 价格值
+ * @param dpr 设备像素比
+ * @param paneWidth pane 宽度
+ * @param scrollLeft 滚动偏移量
+ */
 function drawPriceMarker(ctx: CanvasRenderingContext2D, x: number, y: number, price: number, dpr: number, paneWidth: number, scrollLeft: number) {
     const text = price.toFixed(2)
     const padding = 4
     const lineLength = 30
     const dotRadius = 2
 
-    // 计算文本宽度
     ctx.font = '12px Arial'
     const textMetrics = ctx.measureText(text)
     const textWidth = textMetrics.width
 
-    // 判断是否需要向左绘制
-    // 注意：x 是 world 坐标，需要转换为视口坐标（减去 scrollLeft）再与 paneWidth 比较
     const visibleX = x - scrollLeft
     const rightEdge = visibleX + lineLength + padding + textWidth
     const drawLeft = rightEdge > paneWidth
-
-    // 引导线
     let lineStartX = x
     let lineEndX = drawLeft ? x - lineLength : x + lineLength
     if (lineStartX > lineEndX) {
@@ -79,25 +81,20 @@ function drawPriceMarker(ctx: CanvasRenderingContext2D, x: number, y: number, pr
         ctx.fillRect(lineRect.x, lineRect.y, lineRect.width, lineRect.height)
     }
 
-    // 末端点
     const endX = roundToPhysicalPixel(lineEndX, dpr)
     const alignedY = roundToPhysicalPixel(y, dpr)
     ctx.fillStyle = TEXT_COLORS.WEAK
     ctx.beginPath()
     ctx.arc(endX, alignedY, dotRadius, 0, Math.PI * 2)
     ctx.fill()
-
-    // 文本
     ctx.font = '12px Arial'
     ctx.textBaseline = 'middle'
     ctx.fillStyle = PRICE_COLORS.NEUTRAL
 
     if (drawLeft) {
-        // 向左绘制
         ctx.textAlign = 'right'
         ctx.fillText(text, roundToPhysicalPixel(x - lineLength - padding, dpr), roundToPhysicalPixel(y, dpr))
     } else {
-        // 向右绘制（默认）
         ctx.textAlign = 'left'
         ctx.fillText(text, roundToPhysicalPixel(x + lineLength + padding, dpr), roundToPhysicalPixel(y, dpr))
     }

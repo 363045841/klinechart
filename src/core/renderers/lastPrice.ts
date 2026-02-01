@@ -2,7 +2,7 @@ import type { PaneRenderer } from '@/core/layout/pane'
 import { PRICE_COLORS } from '@/core/theme/colors'
 
 /**
- * 最新价虚线：画在 plotCanvas 的 world 坐标系（需 translate(-scrollLeft,0)）
+ * 最新价虚线渲染器，绘制在 plotCanvas 的 world 坐标系（需 translate(-scrollLeft,0)）
  */
 export const LastPriceLineRenderer: PaneRenderer = {
     draw({ ctx, pane, data, range, scrollLeft, kWidth, kGap, dpr, paneWidth: _paneWidth }) {

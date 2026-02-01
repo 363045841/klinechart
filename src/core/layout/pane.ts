@@ -6,13 +6,21 @@ import { PriceScale } from '@/core/scale/priceScale'
 export type VisibleRange = { start: number; end: number }
 
 /**
- * Pane 级渲染器接口：在单个 pane 的坐标系中绘制内容。
- *
- * 约定：
- * - 调用前 Chart 已经对 `ctx` 做了 `translate(0, pane.top)`，因此 y=0 对应 pane 顶部。
- * - 如需随滚动的 world 坐标，需要 renderer 内部执行 `ctx.translate(-scrollLeft, 0)`。
+ * Pane 级渲染器接口：在单个 pane 的坐标系中绘制内容
  */
 export interface PaneRenderer {
+    /**
+     * 在指定 pane 坐标系中绘制内容
+     * @param ctx Canvas 绘图上下文，Chart 已执行 translate(0, pane.top)，y=0 对应 pane 顶部
+     * @param pane 当前 pane 实例
+     * @param data 全量 K 线数据
+     * @param range 当前视口可见的索引范围
+     * @param scrollLeft 滚动偏移量，renderer 内部如需 world 坐标需执行 ctx.translate(-scrollLeft, 0)
+     * @param kWidth K 线宽度
+     * @param kGap K 线间隔
+     * @param dpr 设备像素比
+     * @param paneWidth pane 宽度
+     */
     draw(args: {
         ctx: CanvasRenderingContext2D
         pane: Pane
@@ -27,13 +35,7 @@ export interface PaneRenderer {
 }
 
 /**
- * Pane：代表一个“窗口区域”（主图 / 副图）。
- *
- * 负责：
- * - 记录自身布局（top/height）
- * - 维护可视价格范围（priceRange）
- * - 拥有独立的 Y 轴缩放器（PriceScale）
- * - 保存一组渲染器（renderers），在 Chart.draw 中按顺序执行。
+ * Pane：代表一个"窗口区域"（主图 / 副图）
  */
 export class Pane {
     readonly id: string
@@ -50,16 +52,16 @@ export class Pane {
     readonly renderers: PaneRenderer[] = []
 
     /**
-     * @param id pane 标识符（例如 'main'、'sub'），用于在 Chart/Interaction 中识别 pane。
+     * 创建 pane 实例
+     * @param id pane 标识符（例如 'main'、'sub'），用于在 Chart/Interaction 中识别 pane
      */
     constructor(id: string) {
         this.id = id
     }
 
     /**
-     * 设置 pane 的垂直布局。
-     *
-     * @param top    相对 plotCanvas 顶部的偏移（逻辑像素）
+     * 设置 pane 的垂直布局
+     * @param top 相对 plotCanvas 顶部的偏移（逻辑像素）
      * @param height pane 高度（逻辑像素）
      */
     setLayout(top: number, height: number) {
@@ -69,23 +71,25 @@ export class Pane {
     }
 
     /**
-     * 设置 Y 轴上下 padding（影响 priceToY 映射的上下留白）。
+     * 设置 Y 轴上下 padding
+     * @param top 上内边距，影响 priceToY 映射的顶部留白
+     * @param bottom 下内边距，影响 priceToY 映射的底部留白
      */
     setPadding(top: number, bottom: number) {
         this.yAxis.setPadding(top, bottom)
     }
 
     /**
-     * 注册一个 pane 级渲染器。
+     * 注册一个 pane 级渲染器
+     * @param renderer pane 级渲染器实例
      */
-    addRenderer(r: PaneRenderer) {
-        this.renderers.push(r)
+    addRenderer(renderer: PaneRenderer) {
+        this.renderers.push(renderer)
     }
 
     /**
-     * 根据当前可见索引区间更新 priceRange，并同步到 yAxis。
-     *
-     * @param data  全量 K 线数据
+     * 根据当前可见索引区间更新 priceRange 并同步到 yAxis
+     * @param data 全量 K 线数据
      * @param range 当前视口可见的索引范围（由 getVisibleRange 计算）
      */
     updateRange(data: KLineData[], range: VisibleRange) {

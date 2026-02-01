@@ -3,6 +3,15 @@ import type { KLineData } from '@/types/price'
 import { calcMAAtIndex } from '@/utils/kline/ma'
 import { MA_COLORS, TEXT_COLORS, PRICE_COLORS } from '@/core/theme/colors'
 
+/**
+ * 绘制均线图例
+ * @param ctx Canvas 绘图上下文
+ * @param yPaddingPx 垂直内边距
+ * @param data K 线数据
+ * @param endIndex 结束索引
+ * @param showMA 显示哪些均线的标志
+ * @param dpr 设备像素比
+ */
 export function drawMALegend(args: {
     ctx: CanvasRenderingContext2D
     yPaddingPx: number
@@ -16,7 +25,6 @@ export function drawMALegend(args: {
 
     const legendX = 12
     const fontSize = 12
-    // 垂直居中渲染
     const legendY = (fontSize + args.yPaddingPx) / 2
     const gap = 10
 

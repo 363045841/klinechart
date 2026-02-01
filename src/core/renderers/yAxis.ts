@@ -2,8 +2,13 @@ import type { PaneRenderer } from '@/core/layout/pane'
 import { drawPriceAxis } from '@/utils/kLineDraw/axis'
 
 /**
- * 右侧轴渲染：每个 pane 各画一段。
- * 说明：目前复用旧的 axis.ts（后续再迁 core 化）。
+ * 创建 Y 轴渲染器，每个 pane 各画一段，复用 drawPriceAxis
+ * @param opts 配置选项
+ * @param opts.axisX 轴的横坐标
+ * @param opts.axisWidth 轴宽度
+ * @param opts.yPaddingPx 垂直内边距
+ * @param opts.ticks 刻度数量（可选，默认根据 pane 高度自动计算）
+ * @returns PaneRenderer 实例
  */
 export function createYAxisRenderer(opts: {
     axisX: number
@@ -23,8 +28,8 @@ export function createYAxisRenderer(opts: {
                 yPaddingPx: opts.yPaddingPx,
                 dpr,
                 ticks,
-                drawLeftBorder: false, // 不绘制左侧边界竖线
-                drawTickLines: false, // 不绘制刻度短线
+                drawLeftBorder: false,
+                drawTickLines: false,
             })
         },
     }
