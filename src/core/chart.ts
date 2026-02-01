@@ -363,7 +363,7 @@ export class Chart {
         const count = end - start
         const dpr = this.viewport?.dpr || window.devicePixelRatio || 1
 
-        // 1. 使用原始逻辑像素参数（与 CandleRenderer 一致）
+        // 1. 使用原始逻辑像素参数
         const unit = this.opt.kWidth + this.opt.kGap
         const startX = this.opt.kGap
 
@@ -373,7 +373,7 @@ export class Chart {
             const dataIndex = start + i
             const leftLogical = startX + dataIndex * unit
             // 2. 与 CandleRenderer 中的对齐方式一致
-            positions[i] = Math.round(leftLogical * dpr) / dpr
+            positions[i] = leftLogical
         }
 
         tagLogThrottle("pos[]", positions, "pos[]", 5000)
