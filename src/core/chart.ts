@@ -177,7 +177,7 @@ export class Chart {
                 dpr: vp.dpr,
                 crosshairPos: isDragging ? null : this.interaction.crosshairPos,
                 crosshairIndex: isDragging ? null : this.interaction.crosshairIndex,
-                title: renderer.getPane().id === 'sub' ? '副图(占位)' : undefined,
+                title: renderer.getPane().id === 'sub' ? 'VOL - 成交量' : undefined,
                 kLinePositions,
             })
         }
