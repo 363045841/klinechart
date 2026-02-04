@@ -2,7 +2,7 @@
 
 [English](README_EN.md) | 简体中文
 
-这是一个基于 Vue 3 和 Canvas 的金融图表绘制库，专注于提供高性能的 K 线图展示功能。该库支持横向滚动、移动平均线（MA）显示以及从多种数据源（包括 **BaoStock**、AKTools）获取金融数据。
+这是一个基于 Canvas 的金融图表绘制库，目前提供 Vue 组件封装。专注于提供高性能的 K 线图展示功能。该库支持横向滚动、移动平均线（MA）显示以及从多种数据源（包括 **BaoStock**、AKTools）获取金融数据。
 
 ![](https://s2.loli.net/2026/02/03/Erv3sSyHwN9Li86.png)
 
