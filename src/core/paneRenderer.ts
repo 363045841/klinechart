@@ -3,6 +3,7 @@ import { Pane, type VisibleRange } from '@/core/layout/pane'
 import { createYAxisRenderer } from '@/core/renderers/yAxis'
 import { drawCrosshairPriceLabelForPane } from '@/core/renderers/crosshairLabels'
 import { drawPaneTitle } from '@/core/renderers/paneTitle'
+import type { MarkerManager } from '@/core/marker/registry'
 
 export type PaneRendererDom = {
     plotCanvas: HTMLCanvasElement
@@ -77,7 +78,7 @@ export class PaneRenderer {
 
     /**
      * 绘制该 Pane 的内容
-     * @param args 绘制参数，包含 K 线数据、可见范围、滚动位置、K 线尺寸、DPR、十字线位置和标题
+     * @param args 绘制参数，包含 K 线数据、可见范围、滚动位置、K 线尺寸、DPR、十字线位置、标题和 markerManager
      */
     draw(args: {
         data: KLineData[]
@@ -90,8 +91,9 @@ export class PaneRenderer {
         crosshairIndex?: number | null
         title?: string
         kLinePositions: number[]
+        markerManager?: MarkerManager
     }) {
-        const { data, range, scrollLeft, kWidth, kGap, dpr, crosshairPos, crosshairIndex, title, kLinePositions } = args
+        const { data, range, scrollLeft, kWidth, kGap, dpr, crosshairPos, crosshairIndex, title, kLinePositions, markerManager } = args
 
         // 1. 获取最新价（最后一根 K 线的收盘价）
         const lastKLine = data.length > 0 ? data[data.length - 1] : undefined
@@ -135,6 +137,7 @@ export class PaneRenderer {
                 dpr,
                 paneWidth,
                 kLinePositions,
+                markerManager: markerManager,
             })
         }
         plotCtx.restore()

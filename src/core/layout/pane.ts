@@ -2,6 +2,7 @@ import type { KLineData } from '@/types/price'
 import { getVisiblePriceRange } from '@/core/viewport/viewport'
 import type { PriceRange } from '@/core/scale/price'
 import { PriceScale } from '@/core/scale/priceScale'
+import type { MarkerManager } from '@/core/marker/registry'
 
 export type VisibleRange = { start: number; end: number }
 
@@ -33,6 +34,7 @@ export interface PaneRenderer {
         dpr: number
         paneWidth: number
         kLinePositions: number[]
+        markerManager: MarkerManager
     }): void
 }
 

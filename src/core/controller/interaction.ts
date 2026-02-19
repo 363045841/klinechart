@@ -1,8 +1,8 @@
 import type { Chart } from '../chart'
+import type { MarkerEntity } from '@/core/marker/registry'
 
 /**
  * 交互控制器，处理拖拽滚动、缩放、十字线 hover 等交互逻辑
- * 只依赖 Chart 公共 API，不依赖 Vue
  */
 export class InteractionController {
     private chart: Chart
@@ -10,7 +10,7 @@ export class InteractionController {
     private dragStartX = 0
     private scrollStartX = 0
 
-    /** 触摸会话标记，避免触摸触发的模拟 mouse 事件干扰 */
+    /** [触屏]:触摸会话标记，避免触摸触发的模拟 mouse 事件干扰 */
     private isTouchSession = false
 
     /** 十字线位置 */
@@ -26,6 +26,19 @@ export class InteractionController {
     /** tooltip 尺寸 */
     tooltipSize: { width: number; height: number } = { width: 220, height: 180 }
 
+    /** 当前 hover 的 marker ID */
+    hoveredMarkerId: string | null = null
+    /** 当前点击的 marker ID */
+    clickedMarkerId: string | null = null
+    /** 当前 hover 的 marker 数据（供外部显示 tooltip 使用） */
+    hoveredMarkerData: MarkerEntity | null = null
+    /** 当前点击的 marker 数据（供外部显示 tooltip 使用） */
+    clickedMarkerData: MarkerEntity | null = null
+    /** marker hover 回调函数 */
+    private onMarkerHoverCallback?: (marker: MarkerEntity | null) => void
+    /** marker click 回调函数 */
+    private onMarkerClickCallback?: (marker: MarkerEntity) => void
+
     /** 当前帧的 K 线起始 x 坐标数组 */
     private kLinePositions: number[] | null = null
     /** 当前帧的可见 K 线索引范围 */
@@ -36,21 +49,54 @@ export class InteractionController {
     }
 
     /**
-     * 处理 Pointer 按下事件（支持触屏设备）
+     * 处理滚轮缩放事件
+     * @param e WheelEvent
+     */
+    onWheel(e: WheelEvent) {
+        const container = this.chart.getDom().container
+        const rect = container.getBoundingClientRect()
+        const mouseX = e.clientX - rect.left
+        const scrollLeft = container.scrollLeft
+
+        this.clearHover()
+        this.chart.zoomAt(mouseX, scrollLeft, e.deltaY)
+    }
+
+    /**
+     * [触屏]:处理 Pointer 按下事件
      * @param e PointerEvent
      */
     onPointerDown(e: PointerEvent) {
-        // 1. 只处理主指针，避免多指触控状态混乱
+        //1. 只处理主指针，避免多指触控状态混乱
         if (e.isPrimary === false) return
 
-        // 2. 标记触摸会话，用于在 mouse 事件中忽略模拟事件
+        //2. 标记触摸会话
         this.isTouchSession = e.pointerType === 'touch'
 
-        // 3. 立即更新十字线位置
+        const container = this.chart.getDom().container
+        const rect = container.getBoundingClientRect()
+        const mouseX = e.clientX - rect.left
+        const mouseY = e.clientY - rect.top
+        const scrollLeft = container.scrollLeft
+
+        //3. 优先检查 marker 点击
+        const markerManager = this.chart.getMarkerManager()
+        const worldX = scrollLeft + mouseX
+        const hitMarker = markerManager.hitTest(worldX, mouseY, 3)
+
+        if (hitMarker) {
+            // 点击了 marker，记录并触发回调
+            this.clickedMarkerId = hitMarker.id
+            this.clickedMarkerData = hitMarker
+            if (this.onMarkerClickCallback) {
+                this.onMarkerClickCallback(hitMarker)
+            }
+            return
+        }
+
+        //4. 没有点击 marker，开始拖拽
         this.isDragging = true
         this.updateHoverFromPoint(e.clientX, e.clientY)
-
-        const container = this.chart.getDom().container
         this.dragStartX = e.clientX
         this.scrollStartX = container.scrollLeft
 
@@ -58,25 +104,11 @@ export class InteractionController {
     }
 
     /**
-     * 处理 Pointer 移动事件
-     * @param e PointerEvent
+     * 设置 tooltip 尺寸
+     * @param size 宽高对象
      */
-    onPointerMove(e: PointerEvent) {
-        if (e.isPrimary === false) return
-        const container = this.chart.getDom().container
-
-        if (this.isDragging) {
-            // 1. 拖拽时更新滚动位置
-            const deltaX = this.dragStartX - e.clientX
-            container.scrollLeft = this.scrollStartX + deltaX
-            // 2. 拖拽时同步更新十字线
-            this.updateHoverFromPoint(e.clientX, e.clientY)
-            this.chart.scheduleDraw()
-            return
-        }
-
-        this.updateHoverFromPoint(e.clientX, e.clientY)
-        this.chart.scheduleDraw()
+    setTooltipSize(size: { width: number; height: number }) {
+        this.tooltipSize = size
     }
 
     /**
@@ -110,6 +142,26 @@ export class InteractionController {
         if (e.button !== 0) return
 
         const container = this.chart.getDom().container
+        const rect = container.getBoundingClientRect()
+        const mouseX = e.clientX - rect.left
+        const mouseY = e.clientY - rect.top
+        const scrollLeft = container.scrollLeft
+
+        // 2. 优先检查 marker 点击
+        const markerManager = this.chart.getMarkerManager()
+        const worldX = scrollLeft + mouseX
+        const hitMarker = markerManager.hitTest(worldX, mouseY, 3)
+
+        if (hitMarker) {
+            // 点击了 marker，记录并触发回调
+            this.clickedMarkerId = hitMarker.id
+            if (this.onMarkerClickCallback) {
+                this.onMarkerClickCallback(hitMarker)
+            }
+            return
+        }
+
+        // 3. 没有点击 marker，开始拖拽
         this.isDragging = true
         this.dragStartX = e.clientX
         this.scrollStartX = container.scrollLeft
@@ -127,7 +179,7 @@ export class InteractionController {
         const container = this.chart.getDom().container
 
         if (this.isDragging) {
-            // 1. 拖拽时更新滚动位置
+            //1. 拖拽时更新滚动位置
             const deltaX = this.dragStartX - e.clientX
             container.scrollLeft = this.scrollStartX + deltaX
             return
@@ -161,25 +213,23 @@ export class InteractionController {
     }
 
     /**
-     * 处理滚轮缩放事件
-     * @param e WheelEvent
+     * [触屏]:处理 Pointer 移动事件
+     * @param e PointerEvent
      */
-    onWheel(e: WheelEvent) {
+    onPointerMove(e: PointerEvent) {
+        if (!this.isTouchSession || !e.isPrimary) return
+
         const container = this.chart.getDom().container
-        const rect = container.getBoundingClientRect()
-        const mouseX = e.clientX - rect.left
-        const scrollLeft = container.scrollLeft
 
-        this.clearHover()
-        this.chart.zoomAt(mouseX, scrollLeft, e.deltaY)
-    }
+        if (this.isDragging) {
+            // 1. 拖拽时更新滚动位置
+            const deltaX = this.dragStartX - e.clientX
+            container.scrollLeft = this.scrollStartX + deltaX
+            return
+        }
 
-    /**
-     * 设置 tooltip 尺寸
-     * @param size 宽高对象
-     */
-    setTooltipSize(size: { width: number; height: number }) {
-        this.tooltipSize = size
+        this.updateHoverFromPoint(e.clientX, e.clientY)
+        this.chart.scheduleDraw()
     }
 
     /**
@@ -197,12 +247,30 @@ export class InteractionController {
         return this.isDragging
     }
 
+    /** 设置 marker hover 回调 */
+    setOnMarkerHover(callback: (marker: MarkerEntity | null) => void) {
+        this.onMarkerHoverCallback = callback
+    }
+
+    /** 设置 marker click 回调 */
+    setOnMarkerClick(callback: (marker: MarkerEntity) => void) {
+        this.onMarkerClickCallback = callback
+    }
+
     /** 清除 hover 状态 */
     private clearHover() {
         this.crosshairPos = null
         this.crosshairIndex = null
         this.hoveredIndex = null
         this.activePaneId = null
+
+        // 清除 marker hover 状态
+        if (this.hoveredMarkerId !== null) {
+            this.hoveredMarkerId = null
+            if (this.onMarkerHoverCallback) {
+                this.onMarkerHoverCallback(null)
+            }
+        }
     }
 
     /**
@@ -239,12 +307,43 @@ export class InteractionController {
         const scrollLeft = container.scrollLeft
         const dpr = window.devicePixelRatio || 1
 
+        // 2. 优先检查 marker 命中（marker 在 world 坐标系）
+        const markerManager = this.chart.getMarkerManager()
+        const worldX = scrollLeft + mouseX
+        const hitMarker = markerManager.hitTest(worldX, mouseY, 3)
+
+        if (hitMarker) {
+            // 命中 marker，更新 hover 状态
+            if (this.hoveredMarkerId !== hitMarker.id) {
+                this.hoveredMarkerId = hitMarker.id
+                this.hoveredMarkerData = hitMarker
+                markerManager.setHover(hitMarker.id)
+                if (this.onMarkerHoverCallback) {
+                    this.onMarkerHoverCallback(hitMarker)
+                }
+            }
+            // marker hover 时不显示十字线和 tooltip
+            this.crosshairPos = null
+            this.crosshairIndex = null
+            this.hoveredIndex = null
+            return
+        } else {
+            // 没有命中 marker，清除 marker hover 状态
+            if (this.hoveredMarkerId !== null) {
+                this.hoveredMarkerId = null
+                this.hoveredMarkerData = null
+                markerManager.setHover(null)
+                if (this.onMarkerHoverCallback) {
+                    this.onMarkerHoverCallback(null)
+                }
+            }
+        }
+
         // 2. 使用原始逻辑像素参数（与 CandleRenderer / calcKLinePositions 一致）
         const unit = opt.kWidth + opt.kGap
         const startX = opt.kGap
 
         // 3. 在逻辑像素空间计算 idx
-        const worldX = scrollLeft + mouseX
         const offset = worldX - startX
 
         if (offset < 0) {

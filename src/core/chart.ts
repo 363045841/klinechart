@@ -8,6 +8,7 @@ import { drawCrosshair } from '@/core/renderers/crosshair'
 import { drawMALegend } from '@/core/renderers/maLegend'
 import { drawAllPanesBorders } from '@/core/renderers/globalBorders'
 import { tagLog, tagLogThrottle } from '@/utils/logger'
+import { MarkerManager } from './marker/registry'
 
 /**
  * 图表 DOM 元素引用
@@ -118,6 +119,7 @@ export class Chart {
     private viewport: Viewport | null = null
 
     private paneRenderers: PaneRenderer[] = []
+    private markerManager: MarkerManager
     readonly interaction: InteractionController
 
     /**
@@ -129,12 +131,16 @@ export class Chart {
         this.dom = dom
         this.opt = opt
         this.interaction = new InteractionController(this)
+        this.markerManager = new MarkerManager()
 
         this.initPanes()
     }
 
-    /** 绘制一帧完整图表 */
+    /** 绘制一帧 */
     draw() {
+        // 重置 Marker 标记
+        this.markerManager.clear()
+
         // 1. 计算视口信息
         const vp = this.computeViewport()
         if (!vp) return
@@ -179,6 +185,7 @@ export class Chart {
                 crosshairIndex: isDragging ? null : this.interaction.crosshairIndex,
                 title: renderer.getPane().id === 'sub' ? 'VOL - 成交量' : undefined,
                 kLinePositions,
+                markerManager: this.markerManager,
             })
         }
 
@@ -326,6 +333,11 @@ export class Chart {
     /** 获取所有 PaneRenderer */
     getPaneRenderers(): PaneRenderer[] {
         return this.paneRenderers
+    }
+
+    /** 获取 MarkerManager（供 InteractionController 使用） */
+    getMarkerManager(): MarkerManager {
+        return this.markerManager
     }
 
     /**

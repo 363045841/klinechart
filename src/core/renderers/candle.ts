@@ -5,10 +5,10 @@ import { PRICE_COLORS } from '@/core/theme/colors'
 import { getPhysicalKLineConfig } from '@/core/chart'
 import { VolumePriceRelation } from '@/types/volumePrice'
 import { analyzeVolumePriceRelationBatch, DEFAULT_VOLUME_PRICE_CONFIG } from '@/utils/volumePrice'
+import type { MarkerManager } from '@/core/marker/registry'
 
 /**
  * Candle 渲染器：在单个 pane 中绘制 K 线蜡烛图
- * 依赖 pane.yAxis 做 price->y 坐标映射，使用物理像素空间计算避免浮点误差
  */
 export const CandleRenderer: PaneRenderer = {
     /**
@@ -24,7 +24,7 @@ export const CandleRenderer: PaneRenderer = {
      * @param _paneWidth pane 宽度（未使用）
      * @param kLinePositions K 线起始 x 坐标数组（由 Chart 统一计算）
      */
-    draw({ ctx, pane, data, range, scrollLeft, kWidth, kGap, dpr, paneWidth: _paneWidth, kLinePositions }) {
+    draw({ ctx, pane, data, range, scrollLeft, kWidth, kGap, dpr, paneWidth: _paneWidth, kLinePositions, markerManager }) {
         if (!data.length) return
 
         const { kWidthPx } = getPhysicalKLineConfig(kWidth, kGap, dpr)
@@ -97,7 +97,8 @@ export const CandleRenderer: PaneRenderer = {
                 const markerY = isRising ? highY - 15 : lowY + 15
                 const markerX = aligned.bodyRect.x + aligned.bodyRect.width / 2
 
-                drawVolumePriceMarker(ctx, markerX, markerY, relation!, kWidth, dpr)
+
+                drawVolumePriceMarker(ctx, markerX, markerY, relation!, i, kWidth, 4, markerManager)
             }
         }
 
@@ -106,25 +107,27 @@ export const CandleRenderer: PaneRenderer = {
 }
 
 /**
- * 绘制量价关系标记
- * 在K线图上标注量价关系标记符号（使用Canvas绘制三角形）
- * 
- * @param ctx - Canvas绘图上下文
- * @param x - 标记的x坐标（三角形中心）
- * @param y - 标记的y坐标（三角形中心）
- * @param relation - 量价关系类型
- * @param kWidth - K线宽度，作为三角形边长
- * @param dpr - 设备像素比
- */
+* 绘制量价关系标记
+* 在K线图上标注量价关系标记符号
+* 
+* @param ctx - Canvas绘图上下文
+* @param x - 标记的x坐标（三角形水平中心）
+* @param y - 标记的y坐标（三角形底边/顶点与K线的接触点）
+* @param relation - 量价关系类型
+* @param kWidth - K线宽度，作为三角形边长
+* @param gap - 三角形与K线的间距，默认为4
+*/
 export function drawVolumePriceMarker(
     ctx: CanvasRenderingContext2D,
     x: number,
     y: number,
     relation: VolumePriceRelation,
+    kIndex: number,
     kWidth: number,
-    dpr: number
+    gap: number = 4,
+    markerManager: MarkerManager
 ): void {
-    const sideLength = kWidth
+    const sideLength = Math.min(kWidth, 20)
     // 等边三角形的高度 = 边长 * √3 / 2
     const height = sideLength * Math.sqrt(3) / 2
 
@@ -133,22 +136,22 @@ export function drawVolumePriceMarker(
 
     switch (relation) {
         case VolumePriceRelation.RISE_WITH_VOLUME:
-            // 量价齐升 - 红色实心向上箭头
+            // 量价齐升 - 红色向上箭头
             color = '#FF4444'
             isUp = true
             break
         case VolumePriceRelation.RISE_WITHOUT_VOLUME:
-            // 缩量上涨 - 绿色空心向上箭头
+            // 缩量上涨 - 绿色向上箭头
             color = '#00C853'
             isUp = true
             break
         case VolumePriceRelation.FALL_WITH_VOLUME:
-            // 放量下跌 - 红色实心向下箭头
+            // 放量下跌 - 红色向下箭头
             color = '#FF4444'
             isUp = false
             break
         case VolumePriceRelation.FALL_WITHOUT_VOLUME:
-            // 缩量下跌 - 绿色空心向下箭头
+            // 缩量下跌 - 绿色向下箭头
             color = '#00C853'
             isUp = false
             break
@@ -160,15 +163,23 @@ export function drawVolumePriceMarker(
     ctx.beginPath()
 
     if (isUp) {
-        // 向上三角形：顶点在上
-        ctx.moveTo(x, y - height / 2)                    // 顶点
-        ctx.lineTo(x - sideLength / 2, y + height / 2)   // 左下角
-        ctx.lineTo(x + sideLength / 2, y + height / 2)   // 右下角
+        // 向上三角形：底边在下，顶点在上
+        // y 是 highY，三角形底边距离 highY 有 gap 的间距
+        const baseY = y - gap           // 底边 y 坐标
+        const tipY = baseY - height     // 顶点 y 坐标
+
+        ctx.moveTo(x, tipY)                          // 顶点
+        ctx.lineTo(x - sideLength / 2, baseY)        // 左下角
+        ctx.lineTo(x + sideLength / 2, baseY)        // 右下角
     } else {
-        // 向下三角形：顶点在下
-        ctx.moveTo(x, y + height / 2)                    // 顶点
-        ctx.lineTo(x - sideLength / 2, y - height / 2)   // 左上角
-        ctx.lineTo(x + sideLength / 2, y - height / 2)   // 右上角
+        // 向下三角形：底边在上，顶点在下
+        // y 是 lowY，三角形底边距离 lowY 有 gap 的间距
+        const baseY = y + gap           // 底边 y 坐标
+        const tipY = baseY + height     // 顶点 y 坐标
+
+        ctx.moveTo(x, tipY)                          // 顶点
+        ctx.lineTo(x - sideLength / 2, baseY)        // 左上角
+        ctx.lineTo(x + sideLength / 2, baseY)        // 右上角
     }
 
     ctx.closePath()
@@ -176,6 +187,55 @@ export function drawVolumePriceMarker(
     ctx.fillStyle = color
     ctx.fill()
 
-
     ctx.restore()
+
+    // 计算三角形的包围盒坐标
+    let boundingX: number
+    let boundingY: number
+
+    if (isUp) {
+        // 向上三角形：底边在下，顶点在上
+        const baseY = y - gap           // 底边 y 坐标
+        const tipY = baseY - height     // 顶点 y 坐标
+        boundingX = x - sideLength / 2  // 左上角 x
+        boundingY = tipY                 // 左上角 y（顶点 y）
+    } else {
+        // 向下三角形：底边在上，顶点在下
+        const baseY = y + gap           // 底边 y 坐标
+        const tipY = baseY + height     // 顶点 y 坐标
+        boundingX = x - sideLength / 2  // 左上角 x
+        boundingY = baseY                // 左上角 y（底边 y）
+    }
+
+    // 根据 VolumePriceRelation 获取对应的 markerType
+    let markerTypeKey: string
+    switch (relation) {
+        case VolumePriceRelation.RISE_WITH_VOLUME:
+            markerTypeKey = 'RISE_WITH_VOLUME'
+            break
+        case VolumePriceRelation.RISE_WITHOUT_VOLUME:
+            markerTypeKey = 'RISE_WITHOUT_VOLUME'
+            break
+        case VolumePriceRelation.FALL_WITH_VOLUME:
+            markerTypeKey = 'FALL_WITH_VOLUME'
+            break
+        case VolumePriceRelation.FALL_WITHOUT_VOLUME:
+            markerTypeKey = 'FALL_WITHOUT_VOLUME'
+            break
+        default:
+            return
+    }
+
+    const markerId = `mk_price-volume_${kIndex}`
+    markerManager.register({
+        id: markerId,
+        type: 'triangle',
+        markerType: markerTypeKey,
+        x: boundingX,
+        y: boundingY,
+        width: sideLength,
+        height: height,
+        dataIndex: kIndex,
+        metadata: { relation }
+    })
 }

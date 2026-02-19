@@ -32,6 +32,11 @@
             :pos="tooltipPos"
             :set-el="setTooltipEl"
           />
+          <MarkerTooltip
+            v-if="hoveredMarker"
+            :marker="hoveredMarker"
+            :pos="mousePos"
+          />
         </div>
       </div>
     </div>
@@ -42,7 +47,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch, nextTick, shallowRef } from 'vue'
 import type { KLineData } from '@/types/price'
+import type { MarkerEntity } from '@/core/marker/registry'
 import KLineTooltip from './KLineTooltip.vue'
+import MarkerTooltip from './MarkerTooltip.vue'
 import IndicatorSelector from './IndicatorSelector.vue'
 import { Chart, type PaneSpec } from '@/core/chart'
 import { CandleRenderer } from '@/core/renderers/candle'
@@ -123,6 +130,10 @@ function setTooltipEl(el: HTMLDivElement | null) {
   })
 }
 
+// ===== Marker tooltip 状态 =====
+const hoveredMarker = ref<MarkerEntity | null>(null)
+const mousePos = ref({ x: 0, y: 0 })
+
 // ===== 交互状态（先保留最小：拖拽时样式） =====
 const isDragging = ref(false)
 
@@ -142,10 +153,13 @@ function syncHoverState() {
   const interaction = chartRef.value?.interaction
   if (!interaction) {
     hoveredIdx.value = null
+    hoveredMarker.value = null
     return
   }
 
   hoveredIdx.value = interaction.hoveredIndex ?? null
+  hoveredMarker.value = (interaction as any).hoveredMarkerData ?? null
+  
   const pos = interaction.tooltipPos
   if (pos) tooltipPosition.value = { x: pos.x, y: pos.y }
 }
@@ -164,11 +178,27 @@ function onPointerDown(e: PointerEvent) {
 }
 
 function onMouseMove(e: MouseEvent) {
+  const container = containerRef.value
+  if (container) {
+    const rect = container.getBoundingClientRect()
+    mousePos.value = {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    }
+  }
   chartRef.value?.interaction.onMouseMove(e)
   syncHoverState()
 }
 
 function onPointerMove(e: PointerEvent) {
+  const container = containerRef.value
+  if (container) {
+    const rect = container.getBoundingClientRect()
+    mousePos.value = {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    }
+  }
   chartRef.value?.interaction.onPointerMove(e)
   syncHoverState()
 }
@@ -260,6 +290,12 @@ onMounted(() => {
   const canvasLayer = canvasLayerRef.value
   const xAxisCanvas = xAxisCanvasRef.value
   if (!container || !canvasLayer || !xAxisCanvas) return
+
+  // 注册 marker hover 回调
+  chartRef.value?.interaction.setOnMarkerHover((marker: MarkerEntity | null) => {
+    hoveredMarker.value = marker
+    scheduleRender()
+  })
 
   // 手动添加 wheel 事件监听器，设置 passive: false 以允许 preventDefault()
   const onWheelHandler = (e: WheelEvent) => {
